@@ -4,7 +4,7 @@
 
 ### 1. 用户注册
 
-**接口:** `POST /user/`
+**接口:** `POST /user/register/`
 
 **请求体:**
 
@@ -12,9 +12,12 @@
 {
   "username": "用户名",
   "email": "邮箱地址",
-  "password": "密码"
+  "password": "密码",
+  "display_name": "显示名称"
 }
 ```
+
+**注意:** `display_name` 字段是可选的，如果不提供则默认使用用户名。
 
 **响应示例:**
 
@@ -23,8 +26,27 @@
   "id": 1,
   "username": "testuser",
   "email": "test@example.com",
+  "display_name": "testuser",
   "is_active": true,
   "permission": "user"
+}
+```
+
+**错误响应:**
+
+用户名已存在:
+
+```json
+{
+  "error": "用户名已存在"
+}
+```
+
+邮箱已存在:
+
+```json
+{
+  "error": "邮箱已存在"
 }
 ```
 
@@ -48,6 +70,7 @@
   "id": 1,
   "username": "testuser",
   "email": "test@example.com",
+  "display_name": "testuser",
   "is_active": true,
   "permission": "user"
 }
@@ -70,6 +93,7 @@ Authorization: Bearer <your_token>
   "id": 1,
   "username": "testuser",
   "email": "test@example.com",
+  "display_name": "testuser",
   "is_active": true,
   "permission": "user"
 }
@@ -93,6 +117,7 @@ Authorization: Bearer <your_token>
     "id": 1,
     "username": "testuser",
     "email": "test@example.com",
+    "display_name": "testuser",
     "is_active": true,
     "permission": "user"
   }
@@ -189,6 +214,12 @@ Authorization: Bearer <your_token>
 ## 认证说明
 
 本 API 使用 Django REST Framework 的默认认证机制。在大多数需要认证的接口中，需要在请求头中包含有效的认证信息。
+
+**重要提示:**
+
+- 用户注册接口 (`POST /user/register/`) 不需要认证，任何人都可以注册新账户
+- 登录接口 (`POST /user/login/`) 不需要认证，但需要提供正确的用户名和密码
+- 其他接口通常需要有效的认证信息
 
 **注意:** 当前的认证实现可能需要配置具体的认证后端(如 Token 认证、Session 认证等)。请根据实际需求配置相应的认证方式。
 

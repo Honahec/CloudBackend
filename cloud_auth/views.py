@@ -39,20 +39,27 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,   
         methods=['post'],
-        url_path='register'
+        url_path='register',
+        permission_classes=[]  # 注册不需要认证
     )
-    def create(self, request):
-        Serializer = UserSerializer(data=request.data)
-        Serializer.is_valid(raise_exception=True)
+    def register(self, request):
+        serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
+        # 检查用户名是否已存在
         if User.objects.filter(username=request.data.get('username')).exists():
             return Response({'error': '用户名已存在'}, status=400)
         
+        # 检查邮箱是否已存在
+        if User.objects.filter(email=request.data.get('email')).exists():
+            return Response({'error': '邮箱已存在'}, status=400)
+        
+        # 创建用户
         user = User.objects.create_user(
-            username=Serializer.validated_data['username'],
-            email=Serializer.validated_data['email'],
-            password=Serializer.validated_data['password'],
-            display_name=Serializer.validated_data['display_name']
+            username=serializer.validated_data['username'],
+            email=serializer.validated_data['email'],
+            password=serializer.validated_data['password'],
+            display_name=serializer.validated_data.get('display_name', serializer.validated_data['username'])
         )
 
         return Response(UserSerializer(user).data, status=201)
@@ -61,10 +68,10 @@ class UserViewSet(viewsets.ModelViewSet):
         detail=False,
         methods=['get'],
         url_path='profile',
-        permission_classes = [IsAuthenticated]
+        permission_classes=[IsAuthenticated]
     )
     def profile(self, request):
-        user: User = self.get_object()
+        user = request.user
         serializer = self.get_serializer(user)
         return Response(serializer.data)
 
@@ -75,10 +82,10 @@ class UserSettingsViewSet(viewsets.ModelViewSet):
         detail=False,
         methods=['post'],
         url_path='change-password',
-        permission_classes = [IsAuthenticated]
+        permission_classes=[IsAuthenticated]
     )
     def change_password(self, request, pk=None):
-        user: User = self.get_object()
+        user = request.user
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
 
