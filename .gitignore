@@ -59,6 +59,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Django migrations
+migrations/
+!migrations/__init__.py
+
 # Flask stuff:
 instance/
 .webassets-cache
@@ -145,3 +149,4 @@ Icon
 *.swp
 *.swo
 *~
+
