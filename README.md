@@ -28,18 +28,6 @@
 }
 ```
 
-**cURL 示例:**
-
-```bash
-curl -X POST http://127.0.0.1:8000/user/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "email": "test@example.com",
-    "password": "testpassword123"
-  }'
-```
-
 ### 2. 用户登录
 
 **接口:** `POST /user/login/`
@@ -148,6 +136,8 @@ Authorization: Bearer <your_token>
 }
 ```
 
+**注意:** 此功能使用 ModelViewSet 的默认实现，可能需要额外的权限验证和业务逻辑。
+
 ### 7. 删除用户
 
 **接口:** `DELETE /user/{id}/`
@@ -157,6 +147,8 @@ Authorization: Bearer <your_token>
 ```
 Authorization: Bearer <your_token>
 ```
+
+**注意:** 此功能使用 ModelViewSet 的默认实现，可能需要额外的权限验证和业务逻辑。
 
 ## 错误响应
 
