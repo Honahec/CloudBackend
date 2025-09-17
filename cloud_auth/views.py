@@ -36,7 +36,11 @@ class UserViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             raise AuthenticationFailed('用户名或密码错误')
 
-
+    @action(
+        detail=False,   
+        methods=['post'],
+        url_path='register'
+    )
     def create(self, request):
         Serializer = UserSerializer(data=request.data)
         Serializer.is_valid(raise_exception=True)
@@ -47,7 +51,8 @@ class UserViewSet(viewsets.ModelViewSet):
         user = User.objects.create_user(
             username=Serializer.validated_data['username'],
             email=Serializer.validated_data['email'],
-            password=Serializer.validated_data['password']
+            password=Serializer.validated_data['password'],
+            display_name=Serializer.validated_data['display_name']
         )
 
         return Response(UserSerializer(user).data, status=201)
