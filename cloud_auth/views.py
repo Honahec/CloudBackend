@@ -21,7 +21,8 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=['post'],
-        url_path='login'
+        url_path='login',
+        permission_classes=[]
     )
     def login(self, request):
         username = request.data.get('username')
@@ -32,15 +33,15 @@ class UserViewSet(viewsets.ModelViewSet):
                 serializer = self.get_serializer(user)
                 return Response(serializer.data)
             else:
-                raise AuthenticationFailed('用户名或密码错误')
+                raise AuthenticationFailed('密码错误')
         except User.DoesNotExist:
-            raise AuthenticationFailed('用户名或密码错误')
+            raise AuthenticationFailed('用户名错误')
 
     @action(
         detail=False,   
         methods=['post'],
         url_path='register',
-        permission_classes=[]  # 注册不需要认证
+        permission_classes=[]
     )
     def register(self, request):
         serializer = UserSerializer(data=request.data)
