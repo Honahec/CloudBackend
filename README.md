@@ -41,14 +41,14 @@ Authorization: Bearer <access_token>
 
 **请求体:**
 
+````j**服务器内部错误:**
+
 ```json
 {
-  "username": "用户名",
-  "email": "邮箱地址",
-  "password": "密码",
-  "display_name": "显示名称"
+  "error": "具体错误信息",
+  "message": "更新文件信息失败"
 }
-```
+````
 
 **注意:** `display_name` 字段是可选的，如果不提供则默认使用用户名。
 
@@ -62,24 +62,6 @@ Authorization: Bearer <access_token>
   "display_name": "testuser",
   "is_active": true,
   "permission": "user"
-}
-```
-
-**错误响应:**
-
-用户名已存在:
-
-```json
-{
-  "error": "用户名已存在"
-}
-```
-
-邮箱已存在:
-
-```json
-{
-  "error": "邮箱已存在"
 }
 ```
 
@@ -110,14 +92,6 @@ Authorization: Bearer <access_token>
   },
   "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
   "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
-}
-```
-
-**错误响应:**
-
-```json
-{
-  "detail": "用户名或密码错误"
 }
 ```
 
@@ -220,14 +194,6 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**错误响应:**
-
-```json
-{
-  "error": "旧密码错误"
-}
-```
-
 ### 7. 更新昵称
 
 **接口:** `POST /user/update-display-name/`
@@ -287,14 +253,6 @@ Authorization: Bearer <access_token>
   "display_name": "testuser",
   "is_active": true,
   "permission": "user"
-}
-```
-
-**错误响应:**
-
-```json
-{
-  "error": "邮箱已存在"
 }
 ```
 
@@ -647,73 +605,66 @@ Authorization: Bearer <access_token>
 }
 ```
 
+### 8. 文件下载
+
+**接口:** `POST /file/{file_id}/download/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**说明:**
+
+- 生成指定文件的临时下载链接
+- 只能下载自己的文件
+- 文件夹无法下载
+- 下载链接具有时效性（根据 OSS 配置）
+
+**响应示例:**
+
+```json
+{
+  "download_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg?Expires=1695123456&OSSAccessKeyId=LTAI4G...&Signature=abc123...",
+  "message": "下载链接已生成"
+}
+```
+
+**错误响应:**
+
+权限不足:
+
+```json
+{
+  "error": "没有权限下载此文件"
+}
+```
+
+文件夹下载错误:
+
+```json
+{
+  "error": "文件夹无法下载"
+}
+```
+
+服务器错误:
+
+```json
+{
+  "error": "具体错误信息",
+  "message": "生成下载链接失败"
+}
+```
+
 ### 文件管理说明
 
 - **路径系统**: 支持虚拟文件夹结构，使用 `path` 字段管理文件层级
 - **文件夹**: 逻辑文件夹，不占用 OSS 存储空间，`content_type` 为 `"folder"`
 - **删除机制**: 采用逻辑删除，文件不会立即从 OSS 删除
 - **更新机制**: 支持部分更新文件信息，包括文件名、路径、大小等元数据
-- **权限控制**: 用户只能管理（查看、更新、删除）自己的文件
+- **下载机制**: 生成临时的 OSS 下载链接，支持安全的文件下载
+- **权限控制**: 用户只能管理（查看、更新、删除、下载）自己的文件
 - **批量上传**: 支持一次性上传多个文件
 - **文件列表**: 按路径层级获取文件列表，返回指定目录下的直接子项
-
-### 常见错误处理
-
-**Token 生成失败:**
-
-```json
-{
-  "error": "具体错误信息",
-  "message": "生成token失败"
-}
-```
-
-**文件上传记录创建失败:**
-
-```json
-{
-  "errors": "验证错误详情",
-  "message": "Invalid file data provided"
-}
-```
-
-**权限不足:**
-
-删除文件:
-
-```json
-{
-  "error": "没有权限删除此文件"
-}
-```
-
-更新文件:
-
-```json
-{
-  "error": "没有权限更新此文件"
-}
-```
-
-**文件更新失败:**
-
-数据验证错误:
-
-```json
-{
-  "errors": {
-    "name": ["此字段不能为空。"],
-    "size": ["请输入一个有效数字。"]
-  },
-  "message": "Invalid data provided"
-}
-```
-
-服务器内部错误:
-
-```json
-{
-  "error": "具体错误信息",
-  "message": "更新文件信息失败"
-}
-```
