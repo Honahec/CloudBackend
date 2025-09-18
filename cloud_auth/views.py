@@ -33,9 +33,9 @@ class UserViewSet(viewsets.ModelViewSet):
                 serializer = self.get_serializer(user)
                 return Response(serializer.data)
             else:
-                raise AuthenticationFailed('密码错误')
+                raise AuthenticationFailed('用户名或密码错误')
         except User.DoesNotExist:
-            raise AuthenticationFailed('用户名错误')
+            raise AuthenticationFailed('用户名或密码错误')
 
     @action(
         detail=False,   
@@ -75,6 +75,15 @@ class UserViewSet(viewsets.ModelViewSet):
         user = request.user
         serializer = self.get_serializer(user)
         return Response(serializer.data)
+    
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='logout',
+        permission_classes=[IsAuthenticated]
+    )
+    def logout(self, request):
+        return Response({'status': '登出成功'})
 
 class UserSettingsViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -96,3 +105,43 @@ class UserSettingsViewSet(viewsets.ModelViewSet):
         user.set_password(new_password)
         user.save()
         return Response({'status': '密码更新成功'})
+    
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='update-display-name',
+        permission_classes=[IsAuthenticated]
+    )
+    def update_display_name(self, request, pk=None):
+        user = request.user
+        display_name = request.data.get('display_name')
+
+        if display_name:
+            user.display_name = display_name
+        else:   
+            user.display_name = user.username
+
+        user.save()
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='update-email',
+        permission_classes=[IsAuthenticated]
+    )
+    def update_email(self, request, pk=None):
+        user = request.user
+        email = request.data.get('email')
+
+        if email:
+            # 检查邮箱是否已存在
+            if User.objects.filter(email=email).exclude(id=user.id).exists():
+                return Response({'error': '邮箱已存在'}, status=400)
+            user.email = email
+            user.save()
+            serializer = UserSerializer(user)
+            return Response(serializer.data)
+        else:
+            return Response({'error': '邮箱不能为空'}, status=400)
