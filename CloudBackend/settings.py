@@ -183,3 +183,9 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
+import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+ALIYUN_ACCESS_KEY = os.getenv('ALIYUN_ACCESS_KEY')
+ALIYUN_ACCESS_KEY_SECRET = os.getenv('ALIYUN_ACCESS_KEY_SECRET')
