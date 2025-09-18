@@ -118,7 +118,7 @@ class FileViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_201_CREATED)
     
     @action(
-        detail=True,
+        detail=False,
         methods=['post'],
         url_path='delete',
     )
@@ -145,7 +145,7 @@ class FileViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     @action(
-        detail=True,
+        detail=False,
         methods=['post'],
         url_path='update',
     )
