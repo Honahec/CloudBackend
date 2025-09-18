@@ -9,3 +9,5 @@ class File(models.Model):
     size = models.IntegerField()
     oss_url = models.URLField(blank=True, null=True) 
     created_at = models.DateTimeField(auto_now_add=True)
+    path = models.CharField(max_length=1024, blank=True, null=True, default='/')
+    is_deleted = models.BooleanField(default=False)

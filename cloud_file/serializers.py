@@ -11,6 +11,7 @@ class FileSerializer(serializers.ModelSerializer):
             "size",
             "oss_url",
             "created_at",
+            "path",
         )
 
 class FileUploadSerializer(serializers.ModelSerializer):
@@ -22,5 +23,6 @@ class FileUploadSerializer(serializers.ModelSerializer):
             "content_type",
             "size",
             "oss_url",
+            "path",
         )
         read_only_fields = ("id",)

@@ -306,68 +306,294 @@ Authorization: Bearer <access_token>
 4. **短期有效**: Access token 有效期较短（60 分钟），降低安全风险
 5. **黑名单**: 注销时 token 会被加入黑名单，防止重复使用
 
+## 数据库模型
+
+### 用户模型 (User)
+
+- `id`: 主键
+- `username`: 用户名（唯一）
+- `email`: 邮箱地址（唯一）
+- `password`: 密码（加密存储）
+- `display_name`: 显示名称
+- `is_active`: 是否激活
+- `permission`: 用户权限
+
+### 文件模型 (File)
+
+- `id`: 主键
+- `user`: 关联用户（外键）
+- `name`: 文件名
+- `content_type`: 文件类型（folder 表示文件夹）
+- `size`: 文件大小（字节）
+- `oss_url`: OSS 存储地址
+- `created_at`: 创建时间
+- `path`: 文件路径
+- `is_deleted`: 是否已删除（逻辑删除）
+
 ## 项目结构
 
 ```
 CloudBackend/
 ├── manage.py                 # Django管理脚本
 ├── requirements.txt          # 项目依赖
+├── db.sqlite3               # SQLite数据库文件
 ├── CloudBackend/            # 主项目配置
 │   ├── settings.py          # Django设置(包含JWT配置)
 │   ├── urls.py              # URL路由配置
 │   └── ...
-└── cloud_auth/              # 认证应用
-    ├── models.py            # 用户数据模型
-    ├── views.py             # JWT认证视图
-    ├── serializers.py       # 序列化器
-    └── ...
+├── cloud_auth/              # 认证应用
+│   ├── models.py            # 用户数据模型
+│   ├── views.py             # JWT认证视图
+│   ├── serializers.py       # 序列化器
+│   └── migrations/          # 数据库迁移文件
+└── cloud_file/              # 文件管理应用
+    ├── models.py            # 文件数据模型
+    ├── views.py             # 文件管理视图
+    ├── serializers.py       # 文件序列化器
+    ├── oss_utils.py         # 阿里云OSS工具类
+    └── migrations/          # 数据库迁移文件
 ```
 
-## 文件上传工作流程说明
+## 文件管理 API 文档
+
+### 文件上传工作流程
+
+本系统采用直接上传到阿里云 OSS 的方式，避免文件经过后端服务器，提高上传效率：
+
+1. **获取上传凭证** → 2. **直接上传到 OSS** → 3. **通知后端创建记录**
 
 ### 1. 获取上传凭证
 
+**接口:** `GET /file/get-token/`
+
+**请求头:**
+
 ```
-GET /file/get-token/
-Authorization: Bearer {access_token}
+Authorization: Bearer <access_token>
+```
+
+**响应示例:**
+
+```json
+{
+  "token": {
+    "accessid": "LTAI4G...",
+    "policy": "eyJleHBpcmF0aW9uIjoi...",
+    "signature": "signature_string",
+    "expiration": "2025-09-18T20:24:39.111339",
+    "bucket": "bucket_name",
+    "endpoint": "endpoint",
+    "prefix": "username/",
+    "host": "https://bucket.oss-region.aliyuncs.com",
+    "max_file_size": 104857600
+  },
+  "message": "已生成token"
+}
 ```
 
 ### 2. 直接上传到阿里云 OSS
 
-使用获取的凭证直接上传文件到 OSS
+使用获取的凭证直接上传文件到 OSS（前端实现）
 
 ### 3. 通知后端上传成功
 
-```
-POST /file/uploaded/
+**接口:** `POST /file/uploaded/`
 
-请求体示例（单个文件）：
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体示例（单个文件）:**
+
+```json
 {
-    "name": "example.jpg",
+  "name": "example.jpg",
+  "content_type": "image/jpeg",
+  "size": 1024000,
+  "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
+  "path": "/"
+}
+```
+
+**请求体示例（批量文件）:**
+
+```json
+[
+  {
+    "name": "file1.jpg",
     "content_type": "image/jpeg",
     "size": 1024000,
-    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg"
-}
-
-请求体示例（批量文件）：
-[
-    {
-        "name": "file1.jpg",
-        "content_type": "image/jpeg",
-        "size": 1024000,
-        "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file1.jpg"
-    },
-    {
-        "name": "file2.pdf",
-        "content_type": "application/pdf",
-        "size": 2048000,
-        "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file2.pdf"
-    }
+    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file1.jpg",
+    "path": "/documents/"
+  },
+  {
+    "name": "file2.pdf",
+    "content_type": "application/pdf",
+    "size": 2048000,
+    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file2.pdf",
+    "path": "/documents/"
+  }
 ]
 ```
 
-### 4. 查看文件列表
+**响应示例:**
+
+```json
+{
+  "files": [
+    {
+      "id": 1,
+      "name": "example.jpg",
+      "content_type": "image/jpeg",
+      "size": 1024000,
+      "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
+      "created_at": "2024-01-01T12:00:00Z",
+      "path": "/"
+    }
+  ],
+  "message": "Successfully created 1 file record(s)"
+}
+```
+
+### 4. 获取文件列表
+
+**接口:** `POST /file/list/`
+
+**请求头:**
 
 ```
-GET /file/
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "path": "/"
+}
+```
+
+**响应示例:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "example.jpg",
+    "content_type": "image/jpeg",
+    "size": 1024000,
+    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
+    "created_at": "2024-01-01T12:00:00Z",
+    "path": "/"
+  },
+  {
+    "id": 2,
+    "name": "documents",
+    "content_type": "folder",
+    "size": 0,
+    "oss_url": "",
+    "created_at": "2024-01-01T11:00:00Z",
+    "path": "/"
+  }
+]
+```
+
+### 5. 创建文件夹
+
+**接口:** `POST /file/new-folder/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "folder_name": "新文件夹",
+  "path": "/"
+}
+```
+
+**响应示例:**
+
+```json
+{
+  "folder": {
+    "id": 3,
+    "name": "新文件夹",
+    "content_type": "folder",
+    "size": 0,
+    "oss_url": "",
+    "created_at": "2024-01-01T13:00:00Z",
+    "path": "/"
+  },
+  "message": "文件夹创建成功"
+}
+```
+
+### 6. 删除文件
+
+**接口:** `POST /file/{file_id}/delete/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**响应示例:**
+
+```json
+{
+  "message": "文件已删除"
+}
+```
+
+**错误响应:**
+
+```json
+{
+  "error": "没有权限删除此文件"
+}
+```
+
+### 文件管理说明
+
+- **路径系统**: 支持虚拟文件夹结构，使用 `path` 字段管理文件层级
+- **文件夹**: 逻辑文件夹，不占用 OSS 存储空间，`content_type` 为 `"folder"`
+- **删除机制**: 采用逻辑删除，文件不会立即从 OSS 删除
+- **权限控制**: 用户只能管理自己的文件
+- **批量上传**: 支持一次性上传多个文件
+
+### 常见错误处理
+
+**Token 生成失败:**
+
+```json
+{
+  "error": "具体错误信息",
+  "message": "生成token失败"
+}
+```
+
+**文件上传记录创建失败:**
+
+```json
+{
+  "errors": "验证错误详情",
+  "message": "Invalid file data provided"
+}
+```
+
+**权限不足:**
+
+```json
+{
+  "error": "没有权限删除此文件"
+}
 ```

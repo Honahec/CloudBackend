@@ -12,9 +12,14 @@ class FileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = FileSerializer
 
-    def get_queryset(self):
+    @action(detail=False, methods=['post'], url_path='list')
+    def get_queryset(self, request):
         user = self.request.user
-        queryset = File.objects.filter(user=user)
+        queryset = File.objects.filter(
+            user=user,
+            path=request.data.get('path', '/'),
+            is_deleted=False
+        )
         return queryset.order_by('-id')
 
     # 完成客户端上传后调用此接口创建文件记录
@@ -76,4 +81,62 @@ class FileViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': str(e),
                 'message': '生成token失败'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='new-folder',
+    )
+    def new_folder(self, request):
+        """
+        创建新文件夹（逻辑文件夹）
+        """
+        folder_name = request.data.get('folder_name')
+        path = request.data.get('path', '/')
+        if not folder_name:
+            return Response({'error': '需要提供folder_name'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = request.user
+        # 创建一个逻辑文件夹记录，实际不占用OSS存储
+        folder = File.objects.create(
+            user=user,
+            name=folder_name,
+            content_type='folder',
+            size=0,
+            oss_url='',
+            path=path,
+            is_deleted=False
+        )
+        
+        return Response({
+            'folder': FileSerializer(folder).data,
+            'message': '文件夹创建成功'
+        }, status=status.HTTP_201_CREATED)
+    
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='delete',
+    )
+    def delete_file(self, request, pk=None):
+        """
+        删除文件（逻辑删除）
+        """
+        try:
+            user = request.user
+            file = self.get_object()
+            if file.user != user:
+                return Response({'error': '没有权限删除此文件'}, status=status.HTTP_403_FORBIDDEN)
+            
+            # 逻辑删除
+            file.is_deleted = True
+            file.save()
+            
+            return Response({'message': '文件已删除'}, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': '删除文件失败'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
