@@ -198,3 +198,35 @@ class FileViewSet(viewsets.ModelViewSet):
                 'error': str(e),
                 'message': '更新文件信息失败'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='download',
+    )
+    def download_file(self, request, pk=None):
+        """
+        获取文件下载链接
+        """
+        try:
+            user = request.user
+            file = self.get_object()
+            if file.user != user:
+                return Response({'error': '没有权限下载此文件'}, status=status.HTTP_403_FORBIDDEN)
+            
+            if file.content_type == 'folder':
+                return Response({'error': '文件夹无法下载'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            token_generator = OSSTokenGenerator()
+            download_url = token_generator.generate_download_url(file.oss_url)
+            
+            return Response({
+                'download_url': download_url,
+                'message': '下载链接已生成'
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': '生成下载链接失败'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

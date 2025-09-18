@@ -72,3 +72,35 @@ class OSSTokenGenerator:
             
         except Exception as e:
             raise Exception(f"Error generating upload token: {str(e)}")
+        
+    def generate_download_url(self, object_key, expires_in=3600):
+        """
+        生成带签名的下载URL
+        
+        Args:
+            object_key: 文件在OSS中的完整路径
+            expires_in: URL有效期（秒），默认1小时
+            
+        Returns:
+            str: 带签名的下载URL
+        """
+        try:
+            expiration = int((datetime.now() + timedelta(seconds=expires_in)).timestamp())
+            string_to_sign = f"GET\n\n\n{expiration}\n/{self.bucket_name}/{object_key}"
+            signature = base64.b64encode(
+                hmac.new(
+                    self.access_key_secret.encode('utf-8'),
+                    string_to_sign.encode('utf-8'),
+                    hashlib.sha1
+                ).digest()
+            ).decode('utf-8')
+            
+            download_url = (
+                f"https://{self.bucket_name}.{self.endpoint.replace('https://', '').replace('http://', '')}/"
+                f"{object_key}?OSSAccessKeyId={self.access_key_id}&Expires={expiration}&Signature={signature}"
+            )
+            
+            return download_url
+            
+        except Exception as e:
+            raise Exception(f"Error generating download URL: {str(e)}")
