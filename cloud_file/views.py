@@ -12,18 +12,42 @@ class FileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = FileSerializer
 
-    @action(detail=False, methods=['post'], url_path='list')
-    def get_queryset(self, request):
+    def get_queryset(self):
+        """
+        重写 get_queryset 方法，返回当前用户的未删除文件
+        """
         user = self.request.user
-        queryset = File.objects.filter(
-            user=user,
-            path=request.data.get('path', '/'),
-            is_deleted=False
-        )
-        return Response({
-            'files': FileSerializer(queryset, many=True).data,
-            'message': '文件列表获取成功'
-        }, status=status.HTTP_200_OK)
+        return File.objects.filter(user=user, is_deleted=False)
+
+    @action(
+        detail=False,
+        methods=['post'], 
+        url_path='list'
+    )
+    def list_files(self, request):
+        """
+        根据路径获取文件列表
+        """
+        try:
+            user = request.user
+            path = request.data.get('path', '/')
+            
+            queryset = File.objects.filter(
+                user=user,
+                path=path,
+                is_deleted=False
+            )
+            
+            return Response({
+                'files': FileSerializer(queryset, many=True).data,
+                'message': '文件列表获取成功'
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': '获取文件列表失败'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # 完成客户端上传后调用此接口创建文件记录
     @action(detail=False, methods=['post'], url_path='uploaded')
