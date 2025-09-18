@@ -143,3 +143,34 @@ class FileViewSet(viewsets.ModelViewSet):
                 'error': str(e),
                 'message': '删除文件失败'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='update',
+    )
+    def update_file(self, request):
+        try:
+            user = request.user
+            file = self.get_object()
+            if file.user != user:
+                return Response({'error': '没有权限更新此文件'}, status=status.HTTP_403_FORBIDDEN)
+            
+            serializer = FileUploadSerializer(file, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({
+                    'file': FileSerializer(file).data,
+                    'message': '文件信息更新成功'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'errors': serializer.errors,
+                    'message': 'Invalid data provided'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': '更新文件信息失败'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

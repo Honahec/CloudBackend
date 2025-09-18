@@ -475,29 +475,38 @@ Authorization: Bearer <access_token>
 }
 ```
 
+**说明:**
+
+- `path`: 要获取文件列表的路径，默认为根目录 "/"
+- 只返回指定路径下的文件和文件夹，不包含子目录内容
+- 只返回未删除的文件 (`is_deleted=False`)
+
 **响应示例:**
 
 ```json
-[
-  {
-    "id": 1,
-    "name": "example.jpg",
-    "content_type": "image/jpeg",
-    "size": 1024000,
-    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
-    "created_at": "2024-01-01T12:00:00Z",
-    "path": "/"
-  },
-  {
-    "id": 2,
-    "name": "documents",
-    "content_type": "folder",
-    "size": 0,
-    "oss_url": "",
-    "created_at": "2024-01-01T11:00:00Z",
-    "path": "/"
-  }
-]
+{
+  "files": [
+    {
+      "id": 1,
+      "name": "example.jpg",
+      "content_type": "image/jpeg",
+      "size": 1024000,
+      "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
+      "created_at": "2024-01-01T12:00:00Z",
+      "path": "/"
+    },
+    {
+      "id": 2,
+      "name": "documents",
+      "content_type": "folder",
+      "size": 0,
+      "oss_url": "",
+      "created_at": "2024-01-01T11:00:00Z",
+      "path": "/"
+    }
+  ],
+  "message": "文件列表获取成功"
+}
 ```
 
 ### 5. 创建文件夹
@@ -562,13 +571,91 @@ Authorization: Bearer <access_token>
 }
 ```
 
+### 7. 更新文件信息
+
+**接口:** `POST /file/{file_id}/update/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "name": "新文件名.jpg",
+  "content_type": "image/jpeg",
+  "size": 2048000,
+  "oss_url": "https://bucket.oss-region.aliyuncs.com/username/newfile.jpg",
+  "path": "/documents/"
+}
+```
+
+**说明:**
+
+- 支持部分更新，只需要提供需要修改的字段
+- 可更新字段：`name`, `content_type`, `size`, `oss_url`, `path`
+- 只能更新自己的文件
+- `id` 字段为只读，无法修改
+
+**响应示例:**
+
+```json
+{
+  "file": {
+    "id": 1,
+    "name": "新文件名.jpg",
+    "content_type": "image/jpeg",
+    "size": 2048000,
+    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/newfile.jpg",
+    "created_at": "2024-01-01T12:00:00Z",
+    "path": "/documents/"
+  },
+  "message": "文件信息更新成功"
+}
+```
+
+**错误响应:**
+
+权限不足:
+
+```json
+{
+  "error": "没有权限更新此文件"
+}
+```
+
+数据验证失败:
+
+```json
+{
+  "errors": {
+    "name": ["此字段不能为空。"]
+  },
+  "message": "Invalid data provided"
+}
+```
+
+服务器错误:
+
+```json
+{
+  "error": "具体错误信息",
+  "message": "更新文件信息失败"
+}
+```
+
 ### 文件管理说明
 
 - **路径系统**: 支持虚拟文件夹结构，使用 `path` 字段管理文件层级
 - **文件夹**: 逻辑文件夹，不占用 OSS 存储空间，`content_type` 为 `"folder"`
 - **删除机制**: 采用逻辑删除，文件不会立即从 OSS 删除
-- **权限控制**: 用户只能管理自己的文件
+- **更新机制**: 支持部分更新文件信息，包括文件名、路径、大小等元数据
+- **权限控制**: 用户只能管理（查看、更新、删除）自己的文件
 - **批量上传**: 支持一次性上传多个文件
+- **文件列表**: 按路径层级获取文件列表，返回指定目录下的直接子项
 
 ### 常见错误处理
 
@@ -592,8 +679,41 @@ Authorization: Bearer <access_token>
 
 **权限不足:**
 
+删除文件:
+
 ```json
 {
   "error": "没有权限删除此文件"
+}
+```
+
+更新文件:
+
+```json
+{
+  "error": "没有权限更新此文件"
+}
+```
+
+**文件更新失败:**
+
+数据验证错误:
+
+```json
+{
+  "errors": {
+    "name": ["此字段不能为空。"],
+    "size": ["请输入一个有效数字。"]
+  },
+  "message": "Invalid data provided"
+}
+```
+
+服务器内部错误:
+
+```json
+{
+  "error": "具体错误信息",
+  "message": "更新文件信息失败"
 }
 ```
