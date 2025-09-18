@@ -322,3 +322,52 @@ CloudBackend/
     ├── serializers.py       # 序列化器
     └── ...
 ```
+
+## 文件上传工作流程说明
+
+### 1. 获取上传凭证
+
+```
+GET /file/get-token/
+Authorization: Bearer {access_token}
+```
+
+### 2. 直接上传到阿里云 OSS
+
+使用获取的凭证直接上传文件到 OSS
+
+### 3. 通知后端上传成功
+
+```
+POST /file/uploaded/
+
+请求体示例（单个文件）：
+{
+    "name": "example.jpg",
+    "content_type": "image/jpeg",
+    "size": 1024000,
+    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg"
+}
+
+请求体示例（批量文件）：
+[
+    {
+        "name": "file1.jpg",
+        "content_type": "image/jpeg",
+        "size": 1024000,
+        "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file1.jpg"
+    },
+    {
+        "name": "file2.pdf",
+        "content_type": "application/pdf",
+        "size": 2048000,
+        "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file2.pdf"
+    }
+]
+```
+
+### 4. 查看文件列表
+
+```
+GET /file/
+```

@@ -18,9 +18,11 @@ from django.contrib import admin
 from django.urls import re_path, include
 from rest_framework.routers import DefaultRouter
 from cloud_auth.views import UserViewSet
+from cloud_file.views import FileViewSet
 
 router = DefaultRouter()
 router.register(r'user', UserViewSet, basename='user')
+router.register(r'file', FileViewSet, basename='file')
 
 urlpatterns = [
     re_path(r'django-admin/', admin.site.urls),

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'cloud_auth',
+    'cloud_file',
 ]
 
 MIDDLEWARE = [
@@ -189,3 +190,5 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 ALIYUN_ACCESS_KEY = os.getenv('ALIYUN_ACCESS_KEY')
 ALIYUN_ACCESS_KEY_SECRET = os.getenv('ALIYUN_ACCESS_KEY_SECRET')
+OSS_ENDPOINT = os.getenv('OSS_ENDPOINT')
+OSS_BUCKET_NAME = os.getenv('OSS_BUCKET_NAME')
