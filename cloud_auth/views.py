@@ -5,6 +5,9 @@ from .serializers import UserSerializer
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 # Create your views here.
 
@@ -30,8 +33,14 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user = User.objects.get(username=username)
             if user.check_password(password):
+                # 生成JWT token
+                refresh = RefreshToken.for_user(user)
                 serializer = self.get_serializer(user)
-                return Response(serializer.data)
+                return Response({
+                    'user': serializer.data,
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                })
             else:
                 raise AuthenticationFailed('用户名或密码错误')
         except User.DoesNotExist:
@@ -83,7 +92,35 @@ class UserViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def logout(self, request):
-        return Response({'status': '登出成功'})
+        try:
+            refresh_token = request.data.get("refresh")
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            return Response({'status': '登出成功'})
+        except Exception as e:
+            return Response({'status': '登出成功'})
+
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='refresh-token',
+        permission_classes=[]
+    )
+    def refresh_token(self, request):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response({'error': '需要refresh token'}, status=400)
+        
+        try:
+            refresh = RefreshToken(refresh_token)
+            access_token = refresh.access_token
+            return Response({
+                'access': str(access_token),
+                'refresh': str(refresh),
+            })
+        except TokenError as e:
+            return Response({'error': 'token无效或已过期'}, status=401)
 
 class UserSettingsViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]

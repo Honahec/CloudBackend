@@ -1,6 +1,39 @@
 # CloudBackend
 
-## API
+## JWT 认证说明
+
+本系统使用 JWT (JSON Web Token) 进行身份认证，提供安全且无状态的 API 访问方式。
+
+### Token 配置
+
+- **Access Token 有效期**: 60 分钟
+- **Refresh Token 有效期**: 7 天
+- **Token 轮换**: 启用（刷新时生成新的 refresh token）
+- **黑名单支持**: 启用（注销时将 token 加入黑名单）
+
+### 认证流程
+
+1. 用户登录获取 access_token 和 refresh_token
+2. 使用 access_token 访问受保护的 API
+3. 当 access_token 过期时，使用 refresh_token 获取新的 token
+4. 注销时将 refresh_token 加入黑名单
+
+### Token 使用方式
+
+在需要认证的 API 请求中，在请求头中包含：
+
+```
+Authorization: Bearer <access_token>
+```
+
+**重要提示:**
+
+- 用户注册接口 (`POST /user/register/`) 不需要认证
+- 用户登录接口 (`POST /user/login/`) 不需要认证
+- Token 刷新接口 (`POST /user/refresh-token/`) 不需要认证，但需要有效的 refresh token
+- 其他所有接口都需要有效的 JWT 认证
+
+## API 文档
 
 ### 1. 用户注册
 
@@ -50,7 +83,7 @@
 }
 ```
 
-### 2. 用户登录
+### 2. 用户登录 (JWT)
 
 **接口:** `POST /user/login/`
 
@@ -67,161 +100,211 @@
 
 ```json
 {
-  "id": 1,
-  "username": "testuser",
-  "email": "test@example.com",
-  "display_name": "testuser",
-  "is_active": true,
-  "permission": "user"
-}
-```
-
-### 3. 获取用户个人资料
-
-**接口:** `GET /user/profile/`
-
-**请求头:**
-
-```
-Authorization: Bearer <your_token>
-```
-
-**响应示例:**
-
-```json
-{
-  "id": 1,
-  "username": "testuser",
-  "email": "test@example.com",
-  "display_name": "testuser",
-  "is_active": true,
-  "permission": "user"
-}
-```
-
-### 4. 获取所有用户列表
-
-**接口:** `GET /user/`
-
-**请求头:**
-
-```
-Authorization: Bearer <your_token>
-```
-
-**响应示例:**
-
-```json
-[
-  {
+  "user": {
     "id": 1,
     "username": "testuser",
     "email": "test@example.com",
     "display_name": "testuser",
     "is_active": true,
     "permission": "user"
-  }
-]
+  },
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
 ```
 
-### 5. 获取特定用户信息
-
-**接口:** `GET /user/{id}/`
-
-**请求头:**
-
-```
-Authorization: Bearer <your_token>
-```
-
-### 6. 更新用户信息
-
-**接口:** `PUT /user/{id}/` 或 `PATCH /user/{id}/`
-
-**请求头:**
-
-```
-Authorization: Bearer <your_token>
-```
-
-**请求体(PUT - 完整更新):**
+**错误响应:**
 
 ```json
 {
-  "username": "newusername",
+  "detail": "用户名或密码错误"
+}
+```
+
+### 3. Token 刷新
+
+**接口:** `POST /user/refresh-token/`
+
+**请求体:**
+
+```json
+{
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+**响应示例:**
+
+```json
+{
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+### 4. 用户注销
+
+**接口:** `POST /user/logout/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+**响应示例:**
+
+```json
+{
+  "status": "登出成功"
+}
+```
+
+### 5. 获取用户个人资料
+
+**接口:** `GET /user/profile/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**响应示例:**
+
+```json
+{
+  "id": 1,
+  "username": "testuser",
+  "email": "test@example.com",
+  "display_name": "testuser",
+  "is_active": true,
+  "permission": "user"
+}
+```
+
+## 用户设置接口
+
+### 6. 修改密码
+
+**接口:** `POST /user/change-password/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "old_password": "旧密码",
+  "new_password": "新密码"
+}
+```
+
+**响应示例:**
+
+```json
+{
+  "status": "密码更新成功"
+}
+```
+
+**错误响应:**
+
+```json
+{
+  "error": "旧密码错误"
+}
+```
+
+### 7. 更新昵称
+
+**接口:** `POST /user/update-display-name/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "display_name": "新的昵称"
+}
+```
+
+**响应示例:**
+
+```json
+{
+  "id": 1,
+  "username": "testuser",
+  "email": "test@example.com",
+  "display_name": "新的昵称",
+  "is_active": true,
+  "permission": "user"
+}
+```
+
+### 8. 更新邮箱
+
+**接口:** `POST /user/update-email/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
   "email": "newemail@example.com"
 }
 ```
 
-**请求体(PATCH - 部分更新):**
+**响应示例:**
 
 ```json
 {
-  "email": "newemail@example.com"
+  "id": 1,
+  "username": "testuser",
+  "email": "newemail@example.com",
+  "display_name": "testuser",
+  "is_active": true,
+  "permission": "user"
 }
 ```
 
-**注意:** 此功能使用 ModelViewSet 的默认实现，可能需要额外的权限验证和业务逻辑。
-
-### 7. 删除用户
-
-**接口:** `DELETE /user/{id}/`
-
-**请求头:**
-
-```
-Authorization: Bearer <your_token>
-```
-
-**注意:** 此功能使用 ModelViewSet 的默认实现，可能需要额外的权限验证和业务逻辑。
-
-## 错误响应
-
-当请求出错时，API 会返回相应的 HTTP 状态码和错误信息：
-
-### 400 Bad Request
+**错误响应:**
 
 ```json
 {
-  "error": "用户名已存在"
+  "error": "邮箱已存在"
 }
 ```
 
-### 401 Unauthorized
+## 安全建议
 
-```json
-{
-  "detail": "Authentication credentials were not provided."
-}
-```
-
-### 403 Forbidden
-
-```json
-{
-  "detail": "You do not have permission to perform this action."
-}
-```
-
-### 404 Not Found
-
-```json
-{
-  "detail": "Not found."
-}
-```
-
-## 认证说明
-
-本 API 使用 Django REST Framework 的默认认证机制。在大多数需要认证的接口中，需要在请求头中包含有效的认证信息。
-
-**重要提示:**
-
-- 用户注册接口 (`POST /user/register/`) 不需要认证，任何人都可以注册新账户
-- 登录接口 (`POST /user/login/`) 不需要认证，但需要提供正确的用户名和密码
-- 其他接口通常需要有效的认证信息
-
-**注意:** 当前的认证实现可能需要配置具体的认证后端(如 Token 认证、Session 认证等)。请根据实际需求配置相应的认证方式。
+1. **Token 存储**: 在生产环境中，建议将 token 存储在 HttpOnly Cookie 中而不是 localStorage
+2. **HTTPS**: 生产环境必须使用 HTTPS 来保护 token 传输
+3. **Token 轮换**: 系统已启用 token 轮换，每次刷新都会生成新的 refresh token
+4. **短期有效**: Access token 有效期较短（60 分钟），降低安全风险
+5. **黑名单**: 注销时 token 会被加入黑名单，防止重复使用
 
 ## 项目结构
 
@@ -229,21 +312,13 @@ Authorization: Bearer <your_token>
 CloudBackend/
 ├── manage.py                 # Django管理脚本
 ├── requirements.txt          # 项目依赖
-├── db.sqlite3               # SQLite数据库文件
 ├── CloudBackend/            # 主项目配置
-│   ├── settings.py          # Django设置
+│   ├── settings.py          # Django设置(包含JWT配置)
 │   ├── urls.py              # URL路由配置
 │   └── ...
 └── cloud_auth/              # 认证应用
-    ├── models.py            # 数据模型
-    ├── views.py             # 视图处理
+    ├── models.py            # 用户数据模型
+    ├── views.py             # JWT认证视图
     ├── serializers.py       # 序列化器
     └── ...
 ```
-
-## 开发说明
-
-- 数据库: SQLite (默认)
-- 认证模型: 自定义 User 模型继承自 AbstractUser
-- API 架构: RESTful API
-- 跨域: 已配置 CORS 支持
