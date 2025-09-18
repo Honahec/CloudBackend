@@ -8,6 +8,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework.viewsets import GenericViewSet
 
 # Create your views here.
 
@@ -122,7 +123,7 @@ class UserViewSet(viewsets.ModelViewSet):
         except TokenError as e:
             return Response({'error': 'token无效或已过期'}, status=401)
 
-class UserSettingsViewSet(viewsets.ModelViewSet):
+class UserSettingsViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     @action(
