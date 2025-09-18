@@ -32,7 +32,7 @@ class OSSTokenGenerator:
             expiration_iso = expiration.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
             # 文件路径前缀
-            prefix = f"user_{username}/"
+            prefix = f"{username}/"
             
             # 构造上传策略
             policy_dict = {
