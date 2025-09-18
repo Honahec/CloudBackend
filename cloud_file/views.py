@@ -20,7 +20,10 @@ class FileViewSet(viewsets.ModelViewSet):
             path=request.data.get('path', '/'),
             is_deleted=False
         )
-        return queryset.order_by('-id')
+        return Response({
+            'files': FileSerializer(queryset, many=True).data,
+            'message': '文件列表获取成功'
+        }, status=status.HTTP_200_OK)
 
     # 完成客户端上传后调用此接口创建文件记录
     @action(detail=False, methods=['post'], url_path='uploaded')
