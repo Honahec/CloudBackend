@@ -118,11 +118,11 @@ class FileViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_201_CREATED)
     
     @action(
-        detail=False,
+        detail=True,
         methods=['post'],
         url_path='delete',
     )
-    def delete_file(self, request):
+    def delete_file(self, request, pk=None):
         """
         删除文件（逻辑删除）
         """
@@ -145,11 +145,11 @@ class FileViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     @action(
-        detail=False,
+        detail=True,
         methods=['post'],
         url_path='update',
     )
-    def update_file(self, request):
+    def update_file(self, request, pk=None):
         try:
             user = request.user
             file = self.get_object()
