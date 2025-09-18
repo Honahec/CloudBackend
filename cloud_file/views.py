@@ -122,7 +122,7 @@ class FileViewSet(viewsets.ModelViewSet):
         methods=['post'],
         url_path='delete',
     )
-    def delete_file(self, request, pk=None):
+    def delete_file(self, request):
         """
         删除文件（逻辑删除）
         """
