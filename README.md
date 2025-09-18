@@ -322,3 +322,165 @@ CloudBackend/
     ├── serializers.py       # 序列化器
     └── ...
 ```
+
+## 异步文件上传到阿里云 OSS 功能说明
+
+### 环境配置
+
+#### 1. 环境变量配置
+
+复制 `.env_example` 为 `.env` 并配置以下变量：
+
+```env
+# 阿里云OSS配置
+ALIYUN_ACCESS_KEY=<your_access_key>
+ALIYUN_ACCESS_KEY_SECRET=<your_access_secret>
+OSS_ENDPOINT=<your_oss_endpoint>
+OSS_BUCKET_NAME=<your_bucket_name>
+
+# Celery配置 (Redis)
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+```
+
+#### 2. 启动 Redis 服务
+
+确保 Redis 服务已启动（默认端口 6379）
+
+#### 3. 启动 Celery Worker
+
+```bash
+celery -A CloudBackend worker --loglevel=info
+```
+
+#### 4. 启动 Django 服务
+
+```bash
+python manage.py runserver
+```
+
+### API 使用说明
+
+#### 文件上传
+
+**POST** `/file/`
+
+请求体：
+
+```json
+{
+  "name": "example.jpg",
+  "content_type": "image/jpeg",
+  "size": 1024000,
+  "file_content": "base64_encoded_file_content_here"
+}
+```
+
+响应：
+
+```json
+{
+  "id": 1,
+  "name": "example.jpg",
+  "content_type": "image/jpeg",
+  "size": 1024000,
+  "upload_status": "pending"
+}
+```
+
+#### 批量文件上传
+
+**POST** `/file/`
+
+请求体：
+
+```json
+[
+  {
+    "name": "file1.jpg",
+    "content_type": "image/jpeg",
+    "size": 1024000,
+    "file_content": "base64_content_1"
+  },
+  {
+    "name": "file2.pdf",
+    "content_type": "application/pdf",
+    "size": 2048000,
+    "file_content": "base64_content_2"
+  }
+]
+```
+
+#### 查询上传状态
+
+**GET** `/file/upload_status/?file_ids=1,2,3`
+
+响应：
+
+```json
+[
+  {
+    "id": 1,
+    "name": "example.jpg",
+    "upload_status": "completed",
+    "upload_error": null,
+    "oss_url": "https://your-bucket.oss-cn-hangzhou.aliyuncs.com/files/1/xxx.jpg",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:05:00Z"
+  }
+]
+```
+
+#### 重新上传文件
+
+**POST** `/file/{id}/retry_upload/`
+
+请求体：
+
+```json
+{
+  "file_content": "base64_encoded_file_content_here"
+}
+```
+
+#### 文件列表
+
+**GET** `/file/`
+
+响应：
+
+```json
+[
+  {
+    "id": 1,
+    "name": "example.jpg",
+    "content_type": "image/jpeg",
+    "size": 1024000,
+    "oss_key": "files/1/xxx.jpg",
+    "oss_url": "https://your-bucket.oss-cn-hangzhou.aliyuncs.com/files/1/xxx.jpg",
+    "upload_status": "completed",
+    "upload_error": null,
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:05:00Z"
+  }
+]
+```
+
+### 上传状态说明
+
+- `pending`: 待上传 - 文件记录已创建，等待异步任务处理
+- `uploading`: 上传中 - 异步任务正在处理文件上传
+- `completed`: 上传完成 - 文件已成功上传到 OSS
+- `failed`: 上传失败 - 上传过程中出现错误
+
+### 文件存储结构
+
+OSS 中的文件按以下结构存储：
+
+```
+files/
+  ├── {user_id}/
+  │   ├── {uuid1}.jpg
+  │   ├── {uuid2}.pdf
+  │   └── ...
+```
