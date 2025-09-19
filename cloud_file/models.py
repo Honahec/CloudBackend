@@ -21,7 +21,7 @@ class Drop(models.Model):
     files = models.ManyToManyField(File)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    expire_days = models.IntegerField(choices=ExpireDaysChoice.choices, default=ExpireDaysChoice.ONE_DAYS)
+    expire_days = models.IntegerField(choices=ExpireDaysChoice.choices, default=ExpireDaysChoice.ONE_DAY)
     expire_time = models.DateTimeField()
     is_expired = models.BooleanField(default=False)
     code = models.CharField(max_length=10)
