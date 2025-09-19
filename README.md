@@ -668,3 +668,169 @@ Authorization: Bearer <access_token>
 - **权限控制**: 用户只能管理（查看、更新、删除、下载）自己的文件
 - **批量上传**: 支持一次性上传多个文件
 - **文件列表**: 按路径层级获取文件列表，返回指定目录下的直接子项
+
+## 文件分享 (DROP) API 文档
+
+文件分享功能允许用户创建文件分享链接，其他用户可以通过分享码访问和下载文件。
+
+### 1. 创建文件分享
+
+**接口:** `POST /drop/create/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**请求体:**
+
+```json
+{
+  "files": [1, 2, 3],
+  "expire_days": 7,
+  "code": "abc123",
+  "require_login": false,
+  "max_download_count": 10,
+  "password": "可选密码"
+}
+```
+
+**参数说明:**
+
+- `files`: 要分享的文件 ID 列表（必需）
+- `expire_days`: 过期天数，可选值: 1, 3, 7, 15（默认为 1）
+- `code`: 分享码，最多 10 个字符（必需）
+- `require_login`: 是否需要登录才能访问（默认 false）
+- `max_download_count`: 最大下载次数（默认为 1）
+- `password`: 访问密码，可选
+
+**响应示例:**
+
+```json
+{
+  "drop": {
+    "id": 1,
+    "code": "abc123",
+    "expire_days": 7,
+    "expire_time": "2024-01-08T12:00:00Z",
+    "is_expired": false,
+    "require_login": false,
+    "download_count": 0,
+    "max_download_count": 10,
+    "password": "",
+    "is_deleted": false,
+    "created_at": "2024-01-01T12:00:00Z"
+  },
+  "message": "分享创建成功"
+}
+```
+
+### 2. 获取分享详情
+
+**接口:** `POST /drop/get-drop/`
+
+**请求体:**
+
+```json
+{
+  "code": "abc123",
+  "password": "密码（如果设置了密码）"
+}
+```
+
+**参数说明:**
+
+- `code`: 分享码（必需）
+- `password`: 访问密码（如果分享设置了密码则必需）
+
+**响应示例:**
+
+```json
+{
+  "drop": {
+    "id": 1,
+    "code": "abc123",
+    "expire_days": 7,
+    "expire_time": "2024-01-08T12:00:00Z",
+    "is_expired": false,
+    "require_login": false,
+    "download_count": 1,
+    "max_download_count": 10,
+    "password": "",
+    "is_deleted": false,
+    "created_at": "2024-01-01T12:00:00Z"
+  },
+  "files": [
+    {
+      "id": 1,
+      "name": "example.jpg",
+      "content_type": "image/jpeg",
+      "size": 1024000,
+      "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
+      "created_at": "2024-01-01T12:00:00Z",
+      "path": "/"
+    }
+  ],
+  "message": "获取分享详情成功"
+}
+```
+
+### 3. 删除分享
+
+**接口:** `POST /drop/{drop_id}/delete/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**响应示例:**
+
+```json
+{
+  "message": "分享已删除"
+}
+```
+
+### 4. 获取我的分享列表
+
+**接口:** `GET /drop/`
+
+**请求头:**
+
+```
+Authorization: Bearer <access_token>
+```
+
+**响应示例:**
+
+```json
+[
+  {
+    "id": 1,
+    "code": "abc123",
+    "expire_days": 7,
+    "expire_time": "2024-01-08T12:00:00Z",
+    "is_expired": false,
+    "require_login": false,
+    "download_count": 5,
+    "max_download_count": 10,
+    "password": "",
+    "is_deleted": false,
+    "created_at": "2024-01-01T12:00:00Z"
+  }
+]
+```
+
+### 分享功能说明
+
+- **过期机制**: 分享链接有时间限制，可设置 1、3、7、15 天的有效期
+- **下载限制**: 可设置最大下载次数，防止过度使用
+- **密码保护**: 可选设置密码，增加访问安全性
+- **登录要求**: 可设置是否需要登录才能访问分享
+- **逻辑删除**: 删除分享采用逻辑删除方式
+- **权限控制**: 只能删除自己创建的分享
+- **自动过期**: 系统会自动检查和标记过期的分享
+- **访问计数**: 每次成功访问分享都会增加下载计数

@@ -1,4 +1,4 @@
-from .models import File
+from .models import File, Drop
 from rest_framework import serializers
 
 class FileSerializer(serializers.ModelSerializer):
@@ -24,5 +24,24 @@ class FileUploadSerializer(serializers.ModelSerializer):
             "size",
             "oss_url",
             "path",
+        )
+        read_only_fields = ("id",)
+
+
+class DropSerializer(serializers.Serializer):
+    class Meta:
+        model = Drop
+        exclude = ("files",)
+
+class DropCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Drop
+        fields = (
+            "id",
+            "expire_days",
+            "code",
+            "require_login",
+            "max_download_count",
+            "password",
         )
         read_only_fields = ("id",)
