@@ -33,7 +33,7 @@ Authorization: Bearer <access_token>
 - Token 刷新接口 (`POST /user/refresh-token/`) 不需要认证，但需要有效的 refresh token
 - 其他所有接口都需要有效的 JWT 认证
 
-## API 文档
+## Auth API
 
 ### 1. 用户注册
 
@@ -41,14 +41,14 @@ Authorization: Bearer <access_token>
 
 **请求体:**
 
-````j**服务器内部错误:**
-
 ```json
 {
-  "error": "具体错误信息",
-  "message": "更新文件信息失败"
+  "username": "用户名",
+  "password": "密码",
+  "email": "邮箱",
+  "display_name": "..."
 }
-````
+```
 
 **注意:** `display_name` 字段是可选的，如果不提供则默认使用用户名。
 
@@ -56,12 +56,14 @@ Authorization: Bearer <access_token>
 
 ```json
 {
-  "id": 1,
-  "username": "testuser",
-  "email": "test@example.com",
-  "display_name": "testuser",
-  "is_active": true,
-  "permission": "user"
+  "user": {
+    "id": 1,
+    "username": "testuser",
+    "email": "test@example.com",
+    "display_name": "testuser"
+  },
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
 }
 ```
 
@@ -86,9 +88,7 @@ Authorization: Bearer <access_token>
     "id": 1,
     "username": "testuser",
     "email": "test@example.com",
-    "display_name": "testuser",
-    "is_active": true,
-    "permission": "user"
+    "display_name": "testuser"
   },
   "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
   "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
@@ -120,12 +120,6 @@ Authorization: Bearer <access_token>
 
 **接口:** `POST /user/logout/`
 
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
-
 **请求体:**
 
 ```json
@@ -134,23 +128,9 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**响应示例:**
-
-```json
-{
-  "status": "登出成功"
-}
-```
-
 ### 5. 获取用户个人资料
 
 **接口:** `GET /user/profile/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **响应示例:**
 
@@ -159,23 +139,15 @@ Authorization: Bearer <access_token>
   "id": 1,
   "username": "testuser",
   "email": "test@example.com",
-  "display_name": "testuser",
-  "is_active": true,
-  "permission": "user"
+  "display_name": "testuser"
 }
 ```
 
-## 用户设置接口
+## UserSettings API
 
 ### 6. 修改密码
 
 **接口:** `POST /user/change-password/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -186,23 +158,9 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**响应示例:**
-
-```json
-{
-  "status": "密码更新成功"
-}
-```
-
 ### 7. 更新昵称
 
 **接口:** `POST /user/update-display-name/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -212,28 +170,9 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**响应示例:**
-
-```json
-{
-  "id": 1,
-  "username": "testuser",
-  "email": "test@example.com",
-  "display_name": "新的昵称",
-  "is_active": true,
-  "permission": "user"
-}
-```
-
 ### 8. 更新邮箱
 
 **接口:** `POST /user/update-email/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -243,76 +182,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**响应示例:**
-
-```json
-{
-  "id": 1,
-  "username": "testuser",
-  "email": "newemail@example.com",
-  "display_name": "testuser",
-  "is_active": true,
-  "permission": "user"
-}
-```
-
-## 安全建议
-
-1. **Token 存储**: 在生产环境中，建议将 token 存储在 HttpOnly Cookie 中而不是 localStorage
-2. **HTTPS**: 生产环境必须使用 HTTPS 来保护 token 传输
-3. **Token 轮换**: 系统已启用 token 轮换，每次刷新都会生成新的 refresh token
-4. **短期有效**: Access token 有效期较短（60 分钟），降低安全风险
-5. **黑名单**: 注销时 token 会被加入黑名单，防止重复使用
-
-## 数据库模型
-
-### 用户模型 (User)
-
-- `id`: 主键
-- `username`: 用户名（唯一）
-- `email`: 邮箱地址（唯一）
-- `password`: 密码（加密存储）
-- `display_name`: 显示名称
-- `is_active`: 是否激活
-- `permission`: 用户权限
-
-### 文件模型 (File)
-
-- `id`: 主键
-- `user`: 关联用户（外键）
-- `name`: 文件名
-- `content_type`: 文件类型（folder 表示文件夹）
-- `size`: 文件大小（字节）
-- `oss_url`: OSS 存储地址
-- `created_at`: 创建时间
-- `path`: 文件路径
-- `is_deleted`: 是否已删除（逻辑删除）
-
-## 项目结构
-
-```
-CloudBackend/
-├── manage.py                 # Django管理脚本
-├── requirements.txt          # 项目依赖
-├── db.sqlite3               # SQLite数据库文件
-├── CloudBackend/            # 主项目配置
-│   ├── settings.py          # Django设置(包含JWT配置)
-│   ├── urls.py              # URL路由配置
-│   └── ...
-├── cloud_auth/              # 认证应用
-│   ├── models.py            # 用户数据模型
-│   ├── views.py             # JWT认证视图
-│   ├── serializers.py       # 序列化器
-│   └── migrations/          # 数据库迁移文件
-└── cloud_file/              # 文件管理应用
-    ├── models.py            # 文件数据模型
-    ├── views.py             # 文件管理视图
-    ├── serializers.py       # 文件序列化器
-    ├── oss_utils.py         # 阿里云OSS工具类
-    └── migrations/          # 数据库迁移文件
-```
-
-## 文件管理 API 文档
+## File API
 
 ### 文件上传工作流程
 
@@ -323,12 +193,6 @@ CloudBackend/
 ### 1. 获取上传凭证
 
 **接口:** `GET /file/get-token/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **响应示例:**
 
@@ -345,7 +209,7 @@ Authorization: Bearer <access_token>
     "host": "https://bucket.oss-region.aliyuncs.com",
     "max_file_size": 104857600
   },
-  "message": "已生成token"
+  "message": "Success"
 }
 ```
 
@@ -356,12 +220,6 @@ Authorization: Bearer <access_token>
 ### 3. 通知后端上传成功
 
 **接口:** `POST /file/uploaded/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体示例（单个文件）:**
 
@@ -396,34 +254,9 @@ Authorization: Bearer <access_token>
 ]
 ```
 
-**响应示例:**
-
-```json
-{
-  "files": [
-    {
-      "id": 1,
-      "name": "example.jpg",
-      "content_type": "image/jpeg",
-      "size": 1024000,
-      "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
-      "created_at": "2024-01-01T12:00:00Z",
-      "path": "/"
-    }
-  ],
-  "message": "Successfully created 1 file record(s)"
-}
-```
-
 ### 4. 获取文件列表
 
 **接口:** `POST /file/list/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -463,19 +296,13 @@ Authorization: Bearer <access_token>
       "path": "/"
     }
   ],
-  "message": "文件列表获取成功"
+  "message": "Success"
 }
 ```
 
 ### 5. 创建文件夹
 
 **接口:** `POST /file/new-folder/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -486,58 +313,13 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**响应示例:**
-
-```json
-{
-  "folder": {
-    "id": 3,
-    "name": "新文件夹",
-    "content_type": "folder",
-    "size": 0,
-    "oss_url": "",
-    "created_at": "2024-01-01T13:00:00Z",
-    "path": "/"
-  },
-  "message": "文件夹创建成功"
-}
-```
-
 ### 6. 删除文件
 
 **接口:** `POST /file/{file_id}/delete/`
 
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
-
-**响应示例:**
-
-```json
-{
-  "message": "文件已删除"
-}
-```
-
-**错误响应:**
-
-```json
-{
-  "error": "没有权限删除此文件"
-}
-```
-
 ### 7. 更新文件信息
 
 **接口:** `POST /file/{file_id}/update/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -558,62 +340,9 @@ Authorization: Bearer <access_token>
 - 只能更新自己的文件
 - `id` 字段为只读，无法修改
 
-**响应示例:**
-
-```json
-{
-  "file": {
-    "id": 1,
-    "name": "新文件名.jpg",
-    "content_type": "image/jpeg",
-    "size": 2048000,
-    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/newfile.jpg",
-    "created_at": "2024-01-01T12:00:00Z",
-    "path": "/documents/"
-  },
-  "message": "文件信息更新成功"
-}
-```
-
-**错误响应:**
-
-权限不足:
-
-```json
-{
-  "error": "没有权限更新此文件"
-}
-```
-
-数据验证失败:
-
-```json
-{
-  "errors": {
-    "name": ["此字段不能为空。"]
-  },
-  "message": "Invalid data provided"
-}
-```
-
-服务器错误:
-
-```json
-{
-  "error": "具体错误信息",
-  "message": "更新文件信息失败"
-}
-```
-
 ### 8. 文件下载
 
 **接口:** `POST /file/{file_id}/download/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **说明:**
 
@@ -627,61 +356,17 @@ Authorization: Bearer <access_token>
 ```json
 {
   "download_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg?Expires=1695123456&OSSAccessKeyId=LTAI4G...&Signature=abc123...",
-  "message": "下载链接已生成"
+  "message": "Success"
 }
 ```
 
-**错误响应:**
-
-权限不足:
-
-```json
-{
-  "error": "没有权限下载此文件"
-}
-```
-
-文件夹下载错误:
-
-```json
-{
-  "error": "文件夹无法下载"
-}
-```
-
-服务器错误:
-
-```json
-{
-  "error": "具体错误信息",
-  "message": "生成下载链接失败"
-}
-```
-
-### 文件管理说明
-
-- **路径系统**: 支持虚拟文件夹结构，使用 `path` 字段管理文件层级
-- **文件夹**: 逻辑文件夹，不占用 OSS 存储空间，`content_type` 为 `"folder"`
-- **删除机制**: 采用逻辑删除，文件不会立即从 OSS 删除
-- **更新机制**: 支持部分更新文件信息，包括文件名、路径、大小等元数据
-- **下载机制**: 生成临时的 OSS 下载链接，支持安全的文件下载
-- **权限控制**: 用户只能管理（查看、更新、删除、下载）自己的文件
-- **批量上传**: 支持一次性上传多个文件
-- **文件列表**: 按路径层级获取文件列表，返回指定目录下的直接子项
-
-## 文件分享 (DROP) API 文档
+## DROP API
 
 文件分享功能允许用户创建文件分享链接，其他用户可以通过分享码访问和下载文件。
 
 ### 1. 创建文件分享
 
 **接口:** `POST /drop/create/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **请求体:**
 
@@ -704,27 +389,6 @@ Authorization: Bearer <access_token>
 - `require_login`: 是否需要登录才能访问（默认 false）
 - `max_download_count`: 最大下载次数（默认为 1）
 - `password`: 访问密码，可选
-
-**响应示例:**
-
-```json
-{
-  "drop": {
-    "id": 1,
-    "code": "abc123",
-    "expire_days": 7,
-    "expire_time": "2024-01-08T12:00:00Z",
-    "is_expired": false,
-    "require_login": false,
-    "download_count": 0,
-    "max_download_count": 10,
-    "password": "",
-    "is_deleted": false,
-    "created_at": "2024-01-01T12:00:00Z"
-  },
-  "message": "分享创建成功"
-}
-```
 
 ### 2. 获取分享详情
 
@@ -772,7 +436,7 @@ Authorization: Bearer <access_token>
       "path": "/"
     }
   ],
-  "message": "获取分享详情成功"
+  "message": "Success"
 }
 ```
 
@@ -780,29 +444,9 @@ Authorization: Bearer <access_token>
 
 **接口:** `POST /drop/{drop_id}/delete/`
 
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
-
-**响应示例:**
-
-```json
-{
-  "message": "分享已删除"
-}
-```
-
 ### 4. 获取我的分享列表
 
 **接口:** `GET /drop/`
-
-**请求头:**
-
-```
-Authorization: Bearer <access_token>
-```
 
 **响应示例:**
 
@@ -823,14 +467,3 @@ Authorization: Bearer <access_token>
   }
 ]
 ```
-
-### 分享功能说明
-
-- **过期机制**: 分享链接有时间限制，可设置 1、3、7、15 天的有效期
-- **下载限制**: 可设置最大下载次数，防止过度使用
-- **密码保护**: 可选设置密码，增加访问安全性
-- **登录要求**: 可设置是否需要登录才能访问分享
-- **逻辑删除**: 删除分享采用逻辑删除方式
-- **权限控制**: 只能删除自己创建的分享
-- **自动过期**: 系统会自动检查和标记过期的分享
-- **访问计数**: 每次成功访问分享都会增加下载计数

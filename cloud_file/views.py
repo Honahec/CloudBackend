@@ -40,13 +40,13 @@ class FileViewSet(viewsets.ModelViewSet):
             
             return Response({
                 'files': FileSerializer(queryset, many=True).data,
-                'message': '文件列表获取成功'
+                'message': 'Success'
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '获取文件列表失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # 完成客户端上传后调用此接口创建文件记录
@@ -77,7 +77,6 @@ class FileViewSet(viewsets.ModelViewSet):
                     }, status=status.HTTP_400_BAD_REQUEST)
             
             return Response({
-                'files': created_files,
                 'message': f'Successfully created {len(created_files)} file record(s)'
             }, status=status.HTTP_201_CREATED)
             
@@ -101,13 +100,13 @@ class FileViewSet(viewsets.ModelViewSet):
             
             return Response({
                 'token': upload_token,
-                'message': '已生成token'
+                'message': 'Success'
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '生成token失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(
@@ -122,7 +121,7 @@ class FileViewSet(viewsets.ModelViewSet):
         folder_name = request.data.get('folder_name')
         path = request.data.get('path', '/')
         if not folder_name:
-            return Response({'error': '需要提供folder_name'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Need folder_name'}, status=status.HTTP_400_BAD_REQUEST)
         
         user = request.user
         # 创建一个逻辑文件夹记录，实际不占用OSS存储
@@ -137,8 +136,7 @@ class FileViewSet(viewsets.ModelViewSet):
         )
         
         return Response({
-            'folder': FileSerializer(folder).data,
-            'message': '文件夹创建成功'
+            'message': 'Success',
         }, status=status.HTTP_201_CREATED)
     
     @action(
@@ -154,18 +152,18 @@ class FileViewSet(viewsets.ModelViewSet):
             user = request.user
             file = self.get_object()
             if file.user != user:
-                return Response({'error': '没有权限删除此文件'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
             
             # 逻辑删除
             file.is_deleted = True
             file.save()
             
-            return Response({'message': '文件已删除'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Success'}, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '删除文件失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     @action(
@@ -178,14 +176,13 @@ class FileViewSet(viewsets.ModelViewSet):
             user = request.user
             file = self.get_object()
             if file.user != user:
-                return Response({'error': '没有权限更新此文件'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
             
             serializer = FileUploadSerializer(file, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response({
-                    'file': FileSerializer(file).data,
-                    'message': '文件信息更新成功'
+                    'message': 'Success'
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({
@@ -196,7 +193,7 @@ class FileViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '更新文件信息失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     @action(
@@ -212,23 +209,23 @@ class FileViewSet(viewsets.ModelViewSet):
             user = request.user
             file = self.get_object()
             if file.user != user:
-                return Response({'error': '没有权限下载此文件'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
             
             if file.content_type == 'folder':
-                return Response({'error': '文件夹无法下载'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'You cannot download a folder'}, status=status.HTTP_400_BAD_REQUEST)
             
             token_generator = OSSTokenGenerator()
             download_url = token_generator.generate_download_url(file.oss_url)
             
             return Response({
                 'download_url': download_url,
-                'message': '下载链接已生成'
+                'message': 'Success'
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '生成下载链接失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class DropViewSet(viewsets.ModelViewSet):
@@ -267,11 +264,11 @@ class DropViewSet(viewsets.ModelViewSet):
             password = request.data.get('password', '')
 
             if not files_ids:
-                return Response({'error': '需要提供文件列表'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Need dropping list'}, status=status.HTTP_400_BAD_REQUEST)
             
             files = File.objects.filter(id__in=files_ids, user=user, is_deleted=False)
             if files.count() != len(files_ids):
-                return Response({'error': '部分文件不存在或无权限'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'No permission'}, status=status.HTTP_400_BAD_REQUEST)
             
             from django.utils import timezone
             from datetime import timedelta
@@ -290,14 +287,13 @@ class DropViewSet(viewsets.ModelViewSet):
             drop.save()
             
             return Response({
-                'drop': DropSerializer(drop).data,
-                'message': '分享创建成功'
+                'message': 'Success'
             }, status=status.HTTP_201_CREATED)
         
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '创建分享失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     @action(
@@ -313,12 +309,12 @@ class DropViewSet(viewsets.ModelViewSet):
             code = request.data.get('code', '')
             password = request.data.get('password', '')
             if not code:
-                return Response({'error': '需要提供分享code'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Need sharing code'}, status=status.HTTP_400_BAD_REQUEST)
             
             try:
                 drop = Drop.objects.get(code=code, is_deleted=False)
             except Drop.DoesNotExist:
-                return Response({'error': '分享不存在'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Error'}, status=status.HTTP_404_NOT_FOUND)
             
             from django.utils import timezone
 
@@ -326,16 +322,16 @@ class DropViewSet(viewsets.ModelViewSet):
                 drop.is_expired = True
 
             if drop.is_expired:
-                return Response({'error': '分享已过期'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Error'}, status=status.HTTP_400_BAD_REQUEST)
             
             if drop.password and drop.password != password:
-                return Response({'error': '密码错误'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'Wrong password'}, status=status.HTTP_403_FORBIDDEN)
             
             if drop.require_login and not request.user.is_authenticated:
-                return Response({'error': '需要登录后访问'}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
             
             if drop.download_count >= drop.max_download_count:
-                return Response({'error': '下载次数已达上限'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Error'}, status=status.HTTP_400_BAD_REQUEST)
             
             files = drop.files.filter(is_deleted=False)
             drop.download_count += 1
@@ -344,13 +340,13 @@ class DropViewSet(viewsets.ModelViewSet):
             return Response({
                 'drop': DropSerializer(drop).data,
                 'files': FileSerializer(files, many=True).data,
-                'message': '获取分享详情成功'
+                'message': 'Success'
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '获取分享详情失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     @action(
@@ -366,16 +362,16 @@ class DropViewSet(viewsets.ModelViewSet):
             user = request.user
             drop = self.get_object()
             if drop.user != user:
-                return Response({'error': '没有权限删除此分享'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
             
             # 逻辑删除
             drop.is_deleted = True
             drop.save()
             
-            return Response({'message': '分享已删除'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Success'}, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({
                 'error': str(e),
-                'message': '删除分享失败'
+                'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
