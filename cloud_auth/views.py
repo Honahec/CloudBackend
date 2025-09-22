@@ -110,9 +110,9 @@ class UserAuthViewSet(viewsets.ModelViewSet):
             if refresh_token:
                 token = RefreshToken(refresh_token)
                 token.blacklist()
-            return Response({'status': 'Success'})
+            return Response({'status': 'Success'}, status=200)
         except Exception as e:
-            return Response({'status': 'Success'})
+            return Response({'status': 'Success'}, status=200)
 
     @action(
         detail=False,
@@ -154,7 +154,7 @@ class UserSettingsViewSet(GenericViewSet):
 
         user.set_password(new_password)
         user.save()
-        return Response({'status': 'Success'})
+        return Response({'status': 'Success'}, status=200)
     
     @action(
         detail=False,
@@ -172,7 +172,7 @@ class UserSettingsViewSet(GenericViewSet):
             user.display_name = user.username
 
         user.save()
-        return Response('status', 'Success')
+        return Response({'status', 'Success'}, status=200)
     
     @action(
         detail=False,
@@ -190,6 +190,6 @@ class UserSettingsViewSet(GenericViewSet):
                 return Response({'error': 'email already exists'}, status=400)
             user.email = email
             user.save()
-            return Response('status', 'Success')
+            return Response({'status', 'Success'}, status=200)
         else:
             return Response({'error': 'Email is neccessary'}, status=400)
