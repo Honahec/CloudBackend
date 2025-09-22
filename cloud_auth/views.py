@@ -65,13 +65,19 @@ class UserAuthViewSet(viewsets.ModelViewSet):
         if User.objects.filter(email=request.data.get('email')).exists():
             return Response({'error': 'Email already exists'}, status=400)
         
+        # 先创建权限对象
+        from .models import Permission
+        user_permission = Permission.objects.create()
+        
         # 创建用户
         user = User.objects.create_user(
             username=serializer.validated_data['username'],
             email=serializer.validated_data['email'],
-            password=serializer.validated_data['password'],
-            display_name=serializer.validated_data.get('display_name', serializer.validated_data['username'])
+            password=serializer.validated_data['password']
         )
+        user.display_name = serializer.validated_data.get('display_name', serializer.validated_data['username'])
+        user.permission = user_permission
+        user.save()
 
         refresh = RefreshToken.for_user(user)
 
