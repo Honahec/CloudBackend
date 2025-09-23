@@ -18,12 +18,13 @@ from django.contrib import admin
 from django.urls import re_path, include
 from rest_framework.routers import DefaultRouter
 from cloud_auth.views import UserAuthViewSet, UserSettingsViewSet
-from cloud_file.views import FileViewSet
+from cloud_file.views import FileViewSet, DropViewSet
 
 router = DefaultRouter()
 router.register(r'user', UserAuthViewSet, basename='user')
 router.register(r'user-settings', UserSettingsViewSet, basename='user-settings')
 router.register(r'file', FileViewSet, basename='file')
+router.register(r'drop', DropViewSet, basename='drop')
 
 urlpatterns = [
     re_path(r'django-admin/', admin.site.urls),
