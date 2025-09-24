@@ -17,6 +17,8 @@ class FileViewSet(viewsets.ModelViewSet):
         重写 get_queryset 方法，返回当前用户的未删除文件
         """
         user = self.request.user
+        if not user.is_authenticated:
+            return File.objects.none()
         return File.objects.filter(user=user, is_deleted=False)
 
     @action(
@@ -207,12 +209,11 @@ class FileViewSet(viewsets.ModelViewSet):
         获取文件下载链接
         """
         try:
-            file = self.get_object()
-
             code = request.data.get('code', '')
             password = request.data.get('password', '')
             
             if code:
+                # 通过code访问，直接查询文件而不依赖get_object()
                 try:
                     drop = Drop.objects.get(code=code, is_deleted=False)
                 except Drop.DoesNotExist:
@@ -233,16 +234,19 @@ class FileViewSet(viewsets.ModelViewSet):
                 if drop.password and drop.password != password:
                     return Response({'error': 'Wrong password'}, status=status.HTTP_403_FORBIDDEN)
                 
-                if not drop.files.filter(id=file.id, is_deleted = False).exists():
-                    return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
+                # 直接从drop的files中获取指定的文件
+                try:
+                    file = drop.files.get(id=pk, is_deleted=False)
+                except File.DoesNotExist:
+                    return Response({'error': 'File not found in this drop'}, status=status.HTTP_404_NOT_FOUND)
 
             else:
+                # 正常用户访问，使用get_object()
                 if not request.user.is_authenticated:
                     return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
                 
-                user = request.user
-
-                if file.user != user:
+                file = self.get_object()
+                if file.user != request.user:
                     return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
                 
             if file.content_type == 'folder':
@@ -268,6 +272,9 @@ class DropViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Drop.objects.none()
+            
         drops = Drop.objects.filter(user=user, is_deleted=False)
 
         from django.utils import timezone
@@ -344,32 +351,36 @@ class DropViewSet(viewsets.ModelViewSet):
             code = request.data.get('code', '')
             password = request.data.get('password', '')
             is_require_login = request.data.get('require_login', False)
+            
             if is_require_login and not request.user.is_authenticated:
                 return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
+            
             if not code:
                 return Response({'error': 'Need sharing code'}, status=status.HTTP_400_BAD_REQUEST)
             
+            # 直接查询Drop，不依赖get_queryset
             try:
                 drop = Drop.objects.get(code=code, is_deleted=False)
             except Drop.DoesNotExist:
-                return Response({'error': 'Error'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Invalid code'}, status=status.HTTP_404_NOT_FOUND)
             
             from django.utils import timezone
 
             if drop.expire_time < timezone.now():
                 drop.is_expired = True
+                drop.save()
 
             if drop.is_expired:
-                return Response({'error': 'Error'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            if drop.password and drop.password != password:
-                return Response({'error': 'Wrong password'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'Drop expired'}, status=status.HTTP_400_BAD_REQUEST)
             
             if drop.require_login and not request.user.is_authenticated:
                 return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
             
+            if drop.password and drop.password != password:
+                return Response({'error': 'Wrong password'}, status=status.HTTP_403_FORBIDDEN)
+            
             if drop.download_count >= drop.max_download_count:
-                return Response({'error': 'Error'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Download limit exceeded'}, status=status.HTTP_400_BAD_REQUEST)
             
             files = drop.files.filter(is_deleted=False)
             drop.download_count += 1
