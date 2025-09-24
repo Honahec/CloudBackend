@@ -200,17 +200,51 @@ class FileViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=['post'],
         url_path='download',
+        permission_classes=[]
     )
     def download_file(self, request, pk=None):
         """
         获取文件下载链接
         """
         try:
-            user = request.user
             file = self.get_object()
-            if file.user != user:
-                return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
+
+            code = request.data.get('code', '')
+            password = request.data.get('password', '')
             
+            if code:
+                try:
+                    drop = Drop.objects.get(code=code, is_deleted=False)
+                except Drop.DoesNotExist:
+                    return Response({'error': 'Invalid code'}, status=status.HTTP_404_NOT_FOUND)
+
+                if drop.is_expired:
+                    return Response({'error': 'Drop expired'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                from django.utils import timezone
+                if drop.expire_time < timezone.now():
+                    drop.is_expired = True
+                    drop.save()
+                    return Response({'error': 'Drop expired'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if drop.require_login and not request.user.is_authenticated:
+                    return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
+
+                if drop.password and drop.password != password:
+                    return Response({'error': 'Wrong password'}, status=status.HTTP_403_FORBIDDEN)
+                
+                if not drop.files.filter(id=file.id, is_deleted = False).exists():
+                    return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
+
+            else:
+                if not request.user.is_authenticated:
+                    return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
+                
+                user = request.user
+
+                if file.user != user:
+                    return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
+                
             if file.content_type == 'folder':
                 return Response({'error': 'You cannot download a folder'}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -299,7 +333,8 @@ class DropViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=['post'],
-        url_path='get-drop'
+        url_path='get-drop',
+        permission_classes=[] 
     )
     def get_drop(self, request):
         """
@@ -308,6 +343,9 @@ class DropViewSet(viewsets.ModelViewSet):
         try:
             code = request.data.get('code', '')
             password = request.data.get('password', '')
+            is_require_login = request.data.get('require_login', False)
+            if is_require_login and not request.user.is_authenticated:
+                return Response({'error': 'Please login'}, status=status.HTTP_401_UNAUTHORIZED)
             if not code:
                 return Response({'error': 'Need sharing code'}, status=status.HTTP_400_BAD_REQUEST)
             

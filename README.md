@@ -350,6 +350,16 @@ Authorization: Bearer <access_token>
 - 只能下载自己的文件
 - 文件夹无法下载
 - 下载链接具有时效性（根据 OSS 配置）
+- 特殊判断下载drop文件
+
+***请求体:**
+
+```json
+{
+  "code": "...",
+  "password": "..."
+}
+```
 
 **响应示例:**
 
