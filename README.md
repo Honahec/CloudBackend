@@ -192,7 +192,21 @@ Authorization: Bearer <access_token>
 
 ### 1. 获取上传凭证
 
-**接口:** `GET /file/get-token/`
+**接口:** `POST /file/get-token/`
+
+**请求体**
+
+```json
+[
+  {
+    "file_name": "...",
+    "file_size": "..."
+  },
+  {
+    "..."
+  }
+]
+```
 
 **响应示例:**
 
@@ -350,9 +364,9 @@ Authorization: Bearer <access_token>
 - 只能下载自己的文件
 - 文件夹无法下载
 - 下载链接具有时效性（根据 OSS 配置）
-- 特殊判断下载drop文件
+- 特殊判断下载 drop 文件
 
-***请求体:**
+**请求体:**
 
 ```json
 {

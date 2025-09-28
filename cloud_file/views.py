@@ -6,6 +6,9 @@ from .serializers import FileSerializer, FileUploadSerializer, DropSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .oss_utils import OSSTokenGenerator
+import hashlib
+from django.core.cache import cache
+from django.utils import timezone
 
 # Create your views here.
 class FileViewSet(viewsets.ModelViewSet):
@@ -88,20 +91,42 @@ class FileViewSet(viewsets.ModelViewSet):
                 'message': 'Failed to create file records'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @action(detail=False, methods=['get'], url_path='get-token')
+    @action(detail=False, methods=['post'], url_path='get-token')
     def get_upload_token(self, request):
         """
         获取阿里云OSS上传token
         """
         try:
             user = request.user
-            token_generator = OSSTokenGenerator()
+            file_name = request.data.get('file_name')
+            file_size = request.data.get('file_size')
+            content_type = request.data.get('content_type')
+
+            if not all([file_name, file_size]):
+                return Response({'error': 'Need file_name and file_size'}, status=status.HTTP_400_BAD_REQUEST)
             
+            if user.used_space + file_size > user.quota:
+                return Response({'error': 'Storage quota exceeded'}, status=status.HTTP_400_BAD_REQUEST)
+
+            token_generator = OSSTokenGenerator()
+
+            upload_id = hashlib.md5(f"{user.id}_{file_name}_{file_size}_{timezone.now().timestamp()}".encode()).hexdigest()
+
+            file_info = {
+                'user': user.id,
+                'file_name': file_name,
+                'file_size': file_size,
+                'content_type': content_type,
+                'upload_id': upload_id,
+            }
+            cache.set(f"upload_token_{upload_id}", file_info, timeout=3600)  # 缓存1小时
+
             # 生成上传token
-            upload_token = token_generator.generate_upload_token(user.username)
+            upload_token = token_generator.generate_upload_token(user.username, upload_id)
             
             return Response({
                 'token': upload_token,
+                'upload_id': upload_id,
                 'message': 'Success'
             }, status=status.HTTP_200_OK)
             
@@ -222,7 +247,6 @@ class FileViewSet(viewsets.ModelViewSet):
                 if drop.is_expired:
                     return Response({'error': 'Drop expired'}, status=status.HTTP_400_BAD_REQUEST)
                 
-                from django.utils import timezone
                 if drop.expire_time < timezone.now():
                     drop.is_expired = True
                     drop.save()
