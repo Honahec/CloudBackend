@@ -14,3 +14,5 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
     permission = models.OneToOneField(Permission, on_delete=models.PROTECT, null=True, blank=True)
+    quota = models.BigIntegerField(default=10 * 1024 * 1024 * 1024)
+    used_space = models.BigIntegerField(default=0)
