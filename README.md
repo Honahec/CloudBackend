@@ -197,15 +197,11 @@ Authorization: Bearer <access_token>
 **请求体**
 
 ```json
-[
-  {
-    "file_name": "...",
-    "file_size": "..."
-  },
-  {
-    "..."
-  }
-]
+{
+  "file_name": "...",
+  "file_size": "...",
+  "content_type": "...",
+}
 ```
 
 **响应示例:**
@@ -221,11 +217,15 @@ Authorization: Bearer <access_token>
     "endpoint": "endpoint",
     "prefix": "username/",
     "host": "https://bucket.oss-region.aliyuncs.com",
-    "max_file_size": 104857600
+    "declared_file_size": "file_size",
+    "max_file_size": "max_allowed_size"
   },
+  "upload_id": "...",
   "message": "Success"
 }
 ```
+
+> 20250929变动：删除批量获取功能，请多次获取单个文件凭证
 
 ### 2. 直接上传到阿里云 OSS
 
@@ -235,38 +235,18 @@ Authorization: Bearer <access_token>
 
 **接口:** `POST /file/uploaded/`
 
-**请求体示例（单个文件）:**
+**请求体示例：**
 
 ```json
 {
   "name": "example.jpg",
-  "content_type": "image/jpeg",
-  "size": 1024000,
   "oss_url": "https://bucket.oss-region.aliyuncs.com/username/example.jpg",
-  "path": "/"
+  "path": "/",
+  "upload_id": "..."
 }
 ```
 
-**请求体示例（批量文件）:**
-
-```json
-[
-  {
-    "name": "file1.jpg",
-    "content_type": "image/jpeg",
-    "size": 1024000,
-    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file1.jpg",
-    "path": "/documents/"
-  },
-  {
-    "name": "file2.pdf",
-    "content_type": "application/pdf",
-    "size": 2048000,
-    "oss_url": "https://bucket.oss-region.aliyuncs.com/username/file2.pdf",
-    "path": "/documents/"
-  }
-]
-```
+> 20250929变动：删除批量申报功能，请多次申报单个文件
 
 ### 4. 获取文件列表
 

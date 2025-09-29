@@ -9,6 +9,7 @@ from .oss_utils import OSSTokenGenerator
 import hashlib
 from django.core.cache import cache
 from django.utils import timezone
+from django.db import models
 
 # Create your views here.
 class FileViewSet(viewsets.ModelViewSet):
@@ -54,43 +55,6 @@ class FileViewSet(viewsets.ModelViewSet):
                 'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # 完成客户端上传后调用此接口创建文件记录
-    @action(detail=False, methods=['post'], url_path='uploaded')
-    def uploaded(self, request):
-        try:
-            user = request.user
-            
-            # 支持单个文件或批量文件
-            if isinstance(request.data, dict):
-                files_data = [request.data]
-            else:
-                files_data = request.data
-            
-            created_files = []
-            
-            for file_data in files_data:
-                # 验证数据
-                serializer = FileUploadSerializer(data=file_data)
-                if serializer.is_valid():
-                    # 直接创建已完成状态的文件记录
-                    file_instance = serializer.save(user=user)
-                    created_files.append(FileSerializer(file_instance).data)
-                else:
-                    return Response({
-                        'errors': serializer.errors,
-                        'message': 'Invalid file data provided'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-            
-            return Response({
-                'message': f'Successfully created {len(created_files)} file record(s)'
-            }, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            return Response({
-                'error': str(e),
-                'message': 'Failed to create file records'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
     @action(detail=False, methods=['post'], url_path='get-token')
     def get_upload_token(self, request):
         """
@@ -122,7 +86,7 @@ class FileViewSet(viewsets.ModelViewSet):
             cache.set(f"upload_token_{upload_id}", file_info, timeout=3600)  # 缓存1小时
 
             # 生成上传token
-            upload_token = token_generator.generate_upload_token(user.username, upload_id)
+            upload_token = token_generator.generate_upload_token(user.username, upload_id, file_size)
             
             return Response({
                 'token': upload_token,
@@ -135,7 +99,171 @@ class FileViewSet(viewsets.ModelViewSet):
                 'error': str(e),
                 'message': 'Failed'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # 完成客户端上传后调用此接口创建文件记录
+    @action(detail=False, methods=['post'], url_path='uploaded')
+    def uploaded(self, request):
+        try:
+            user = request.user
+            upload_id = request.data.get('upload_id')
+            
+            if not upload_id:
+                return Response({
+                    'error': 'upload_id is required',
+                    'message': 'Missing upload_id'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 从缓存中获取上传信息
+            cached_info = cache.get(f"upload_token_{upload_id}")
+            if not cached_info:
+                return Response({
+                    'error': 'Invalid or expired upload_id',
+                    'message': 'Upload session not found'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 验证用户身份
+            if cached_info['user'] != user.id:
+                return Response({
+                    'error': 'Permission denied',
+                    'message': 'Upload session belongs to different user'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # 从 OSS 校验文件实际大小
+            token_generator = OSSTokenGenerator()
+            # OSS文件路径应该与客户端上传时使用的路径一致
+            
+            oss_url = request.data.get('oss_url')
+            if not oss_url:
+                return Response({
+                    'error': 'oss_url is required',
+                    'message': 'Missing oss_url'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 从 OSS URL 中提取文件的实际路径
+            # URL 格式: https://bucket.oss-region.aliyuncs.com/username/actual_filename
+            try:
+                oss_key = f"{user.username}/{oss_url.split(f'/{user.username}/')[-1]}"
+            except Exception as e:
+                return Response({
+                    'error': f'Failed to parse OSS URL: {str(e)}',
+                    'message': 'OSS URL parsing failed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                actual_file_size = token_generator.get_file_size(oss_key)
+            except Exception as e:
+                return Response({
+                    'error': f'Failed to verify file on OSS: {str(e)}',
+                    'message': 'OSS file verification failed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 校验文件大小是否与声明的一致（允许小幅偏差）
+            declared_size = cached_info['file_size']
+            if abs(actual_file_size - declared_size) > 1024:  # 允许1KB的偏差
+                return Response({
+                    'error': f'File size mismatch. Declared: {declared_size}, Actual: {actual_file_size}',
+                    'message': 'File size verification failed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 重新检查用户配额（使用实际文件大小）
+            if user.used_space + actual_file_size > user.quota:
+                # 文件已上传到OSS，但配额不足，需要删除OSS文件
+                try:
+                    token_generator.delete_file(oss_key)
+                except:
+                    pass  # 删除失败不影响返回错误
+                
+                return Response({
+                    'error': 'Storage quota exceeded after upload',
+                    'message': 'Insufficient storage space'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 获取其他上传信息
+            path = request.data.get('path', '/')
+            
+            # 创建文件记录（使用客户端传入的实际 OSS URL）
+            File.objects.create(
+                user=user,
+                name=cached_info['file_name'],
+                content_type=cached_info.get('content_type', 'application/octet-stream'),
+                size=actual_file_size,
+                oss_url=oss_url,
+                path=path,
+                is_deleted=False
+            )
+            
+            # 更新用户已使用空间
+            user.used_space += actual_file_size
+            user.save()
+            
+            # 清除缓存
+            cache.delete(f"upload_token_{upload_id}")
+            
+            return Response({
+                'message': 'File uploaded successfully'
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': 'Failed to create file record'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+    @action(detail=False, methods=['get'], url_path='storage-info')
+    def get_storage_info(self, request):
+        """
+        获取用户存储使用情况
+        """
+        try:
+            user = request.user
+            return Response({
+                'quota': user.quota,
+                'used_space': user.used_space,
+                'available_space': user.quota - user.used_space,
+                'usage_percentage': round((user.used_space / user.quota * 100), 2) if user.quota > 0 else 0,
+                'message': 'Success'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': 'Failed to get storage info'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='recalculate-storage')
+    def recalculate_storage(self, request):
+        """
+        重新计算用户存储使用情况（管理员功能或修复数据不一致时使用）
+        """
+        try:
+            user = request.user
+            
+            # 计算用户所有未删除文件的总大小（排除文件夹）
+            total_size = File.objects.filter(
+                user=user, 
+                is_deleted=False,
+                content_type__isnull=False
+            ).exclude(content_type='folder').aggregate(
+                total=models.Sum('size')
+            )['total'] or 0
+            
+            # 更新用户已使用空间
+            old_used_space = user.used_space
+            user.used_space = total_size
+            user.save()
+            
+            return Response({
+                'old_used_space': old_used_space,
+                'new_used_space': total_size,
+                'difference': total_size - old_used_space,
+                'message': 'Storage recalculated successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'message': 'Failed to recalculate storage'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(
         detail=False,
         methods=['post'],
@@ -173,7 +301,7 @@ class FileViewSet(viewsets.ModelViewSet):
     )
     def delete_file(self, request, pk=None):
         """
-        删除文件（逻辑删除）
+        删除文件
         """
         try:
             user = request.user
@@ -181,9 +309,18 @@ class FileViewSet(viewsets.ModelViewSet):
             if file.user != user:
                 return Response({'error': 'No permission'}, status=status.HTTP_403_FORBIDDEN)
             
+            token_generator = OSSTokenGenerator()
+            oss_key = f"{user.username}/{file.oss_url.split(f'/{user.username}/')[-1]}"
+            token_generator.delete_file(oss_key)
+
             # 逻辑删除
             file.is_deleted = True
             file.save()
+            
+            # 更新用户已使用空间（释放空间）
+            if file.content_type != 'folder':
+                user.used_space = max(0, user.used_space - file.size)
+                user.save()
             
             return Response({'message': 'Success'}, status=status.HTTP_200_OK)
         

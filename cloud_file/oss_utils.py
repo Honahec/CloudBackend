@@ -5,6 +5,7 @@ import hashlib
 from datetime import datetime, timedelta
 from urllib.parse import quote
 from django.conf import settings
+import requests
 
 
 class OSSTokenGenerator:
@@ -18,12 +19,14 @@ class OSSTokenGenerator:
     
 
     
-    def generate_upload_token(self, username, duration_seconds=3600):
+    def generate_upload_token(self, username, file_size, duration_seconds=3600):
         """
         生成客户端直传OSS的临时访问令牌
         
         Args:
-            username: 用户ID
+            username: 用户名
+            upload_id: 上传会话ID
+            file_size: 预期文件大小（字节）
             duration_seconds: 令牌有效期（秒），默认1小时
             
         Returns:
@@ -37,13 +40,17 @@ class OSSTokenGenerator:
             # 文件路径前缀
             prefix = f"{username}/"
             
+            # 动态计算文件大小限制（允许10%的缓冲区，最小1MB缓冲）
+            size_buffer = max(1024 * 1024, int(file_size * 0.1))  # 最小1MB或10%缓冲
+            max_allowed_size = file_size + size_buffer
+            
             # 构造上传策略
             policy_dict = {
                 "expiration": expiration_iso,
                 "conditions": [
                     {"bucket": self.bucket_name},
                     ["starts-with", "$key", prefix],
-                    ["content-length-range", 0, 100 * 1024 * 1024]  # 限制文件大小最大100MB
+                    ["content-length-range", 0, max_allowed_size]  # 动态限制文件大小
                 ]
             }
             
@@ -70,7 +77,8 @@ class OSSTokenGenerator:
                 'endpoint': self.endpoint,
                 'prefix': prefix,
                 'host': f"https://{self.bucket_name}.{self.endpoint.replace('https://', '').replace('http://', '')}",
-                'max_file_size': 100 * 1024 * 1024  # 100MB
+                'declared_file_size': file_size,
+                'max_file_size': max_allowed_size
             }
             
         except Exception as e:
@@ -129,3 +137,117 @@ class OSSTokenGenerator:
             
         except Exception as e:
             raise Exception(f"Error generating download URL: {str(e)}")
+    
+    def get_file_size(self, object_key):
+        """
+        从OSS获取文件大小
+        
+        Args:
+            object_key: 文件在OSS中的路径（不包含bucket名）
+            
+        Returns:
+            int: 文件大小（字节）
+        """
+        try:
+            # 构造HEAD请求URL
+            host = self.endpoint.replace('https://', '').replace('http://', '')
+            url = f"https://{self.bucket_name}.{host}/{object_key}"
+            
+            # 生成认证头
+            expiration = int((datetime.now() + timedelta(seconds=60)).timestamp())
+            
+            # 构造StringToSign
+            verb = "HEAD"
+            content_md5 = ""
+            content_type = ""
+            expires = str(expiration)
+            canonicalized_oss_headers = ""
+            canonicalized_resource = f"/{self.bucket_name}/{object_key}"
+            
+            string_to_sign = f"{verb}\n{content_md5}\n{content_type}\n{expires}\n{canonicalized_oss_headers}{canonicalized_resource}"
+            
+            # 计算签名
+            signature = base64.b64encode(
+                hmac.new(
+                    self.access_key_secret.encode('utf-8'),
+                    string_to_sign.encode('utf-8'),
+                    hashlib.sha1
+                ).digest()
+            ).decode('utf-8')
+            
+            # 构建请求参数
+            params = {
+                'OSSAccessKeyId': self.access_key_id,
+                'Expires': expires,
+                'Signature': signature
+            }
+            
+            response = requests.head(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                content_length = response.headers.get('Content-Length')
+                if content_length:
+                    return int(content_length)
+                else:
+                    raise Exception("Content-Length header not found")
+            elif response.status_code == 404:
+                raise Exception(f"File not found: {object_key}")
+            else:
+                raise Exception(f"OSS request failed with status {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            raise Exception(f"Error getting file size from OSS: {str(e)}")
+    
+    def delete_file(self, object_key):
+        """
+        从OSS删除文件
+        
+        Args:
+            object_key: 文件在OSS中的路径（不包含bucket名）
+            
+        Returns:
+            bool: 删除是否成功
+        """
+        try:
+            # 构造DELETE请求URL
+            host = self.endpoint.replace('https://', '').replace('http://', '')
+            url = f"https://{self.bucket_name}.{host}/{object_key}"
+            
+            # 生成认证头
+            expiration = int((datetime.now() + timedelta(seconds=60)).timestamp())
+            
+            # 构造StringToSign
+            verb = "DELETE"
+            content_md5 = ""
+            content_type = ""
+            expires = str(expiration)
+            canonicalized_oss_headers = ""
+            canonicalized_resource = f"/{self.bucket_name}/{object_key}"
+            
+            string_to_sign = f"{verb}\n{content_md5}\n{content_type}\n{expires}\n{canonicalized_oss_headers}{canonicalized_resource}"
+            
+            # 计算签名
+            signature = base64.b64encode(
+                hmac.new(
+                    self.access_key_secret.encode('utf-8'),
+                    string_to_sign.encode('utf-8'),
+                    hashlib.sha1
+                ).digest()
+            ).decode('utf-8')
+            
+            # 构建请求参数
+            params = {
+                'OSSAccessKeyId': self.access_key_id,
+                'Expires': expires,
+                'Signature': signature
+            }
+            
+            response = requests.delete(url, params=params, timeout=10)
+            
+            if response.status_code in [204, 404]:  # 204表示删除成功，404表示文件不存在（也算删除成功）
+                return True
+            else:
+                raise Exception(f"OSS delete failed with status {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            raise Exception(f"Error deleting file from OSS: {str(e)}")
