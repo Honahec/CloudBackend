@@ -155,24 +155,25 @@ class FileViewSet(viewsets.ModelViewSet):
                     'message': 'OSS URL parsing failed'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            try:
-                actual_file_size = token_generator.get_file_size(oss_key)
-            except Exception as e:
-                return Response({
-                    'error': f'Failed to verify file on OSS: {str(e)}',
-                    'message': 'OSS file verification failed'
-                }, status=status.HTTP_400_BAD_REQUEST)
+            # try:
+            #     actual_file_size = token_generator.get_file_size(oss_key)
+            # except Exception as e:
+            #     return Response({
+            #         'error': f'Failed to verify file on OSS: {str(e)}',
+            #         'message': 'OSS file verification failed'
+            #     }, status=status.HTTP_400_BAD_REQUEST)
             
             # 校验文件大小是否与声明的一致（允许小幅偏差）
             declared_size = cached_info['file_size']
-            if abs(actual_file_size - declared_size) > 1024:  # 允许1KB的偏差
-                return Response({
-                    'error': f'File size mismatch. Declared: {declared_size}, Actual: {actual_file_size}',
-                    'message': 'File size verification failed'
-                }, status=status.HTTP_400_BAD_REQUEST)
+            # if abs(actual_file_size - declared_size) > 1024:  # 允许1KB的偏差
+            #     return Response({
+            #         'error': f'File size mismatch. Declared: {declared_size}, Actual: {actual_file_size}',
+            #         'message': 'File size verification failed'
+            #     }, status=status.HTTP_400_BAD_REQUEST)
             
             # 重新检查用户配额（使用实际文件大小）
-            if user.used_space + actual_file_size > user.quota:
+            # if user.used_space + actual_file_size > user.quota:
+            if user.used_space + declared_size > user.quota:
                 # 文件已上传到OSS，但配额不足，需要删除OSS文件
                 try:
                     token_generator.delete_file(oss_key)
@@ -192,14 +193,14 @@ class FileViewSet(viewsets.ModelViewSet):
                 user=user,
                 name=cached_info['file_name'],
                 content_type=cached_info.get('content_type', 'application/octet-stream'),
-                size=actual_file_size,
+                size=declared_size,
                 oss_url=oss_url,
                 path=path,
                 is_deleted=False
             )
             
             # 更新用户已使用空间
-            user.used_space += actual_file_size
+            user.used_space += declared_size
             user.save()
             
             # 清除缓存

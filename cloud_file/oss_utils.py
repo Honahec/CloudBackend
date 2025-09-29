@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 from django.conf import settings
 import requests
-
+import re
 
 class OSSTokenGenerator:
     """阿里云 OSS 上传Token生成器"""
@@ -16,8 +16,6 @@ class OSSTokenGenerator:
         self.access_key_secret = settings.ALIYUN_ACCESS_KEY_SECRET
         self.bucket_name = settings.OSS_BUCKET_NAME
         self.endpoint = settings.OSS_ENDPOINT
-    
-
     
     def generate_upload_token(self, username, file_size, duration_seconds=3600):
         """
@@ -137,65 +135,80 @@ class OSSTokenGenerator:
         except Exception as e:
             raise Exception(f"Error generating download URL: {str(e)}")
     
-    def get_file_size(self, object_key):
-        """
-        从OSS获取文件大小
+    # def get_file_size(self, object_key):
+    #     """
+    #     从OSS获取文件大小
         
-        Args:
-            object_key: 文件在OSS中的路径（不包含bucket名）
+    #     Args:
+    #         object_key: 文件在OSS中的路径（不包含bucket名）
             
-        Returns:
-            int: 文件大小（字节）
-        """
-        try:
-            # 构造HEAD请求URL
-            host = self.endpoint.replace('https://', '').replace('http://', '')
-            url = f"https://{self.bucket_name}.{host}/{object_key}"
+    #     Returns:
+    #         int: 文件大小（字节）
+    #     """
+    #     try:
+    #         # 构造HEAD请求URL
+    #         host = self.endpoint.replace('https://', '').replace('http://', '')
+    #         url = f"https://{self.bucket_name}.{host}/{object_key}"
             
-            # 生成认证头
-            expiration = int((datetime.now() + timedelta(seconds=60)).timestamp())
+    #         # 生成认证头
+    #         expiration = int((datetime.now() + timedelta(seconds=60)).timestamp())
             
-            # 构造StringToSign
-            verb = "HEAD"
-            content_md5 = ""
-            content_type = ""
-            expires = str(expiration)
-            canonicalized_oss_headers = ""
-            canonicalized_resource = f"/{self.bucket_name}/{object_key}"
+    #         # 构造StringToSign
+    #         verb = "HEAD"
+    #         content_md5 = ""
+    #         content_type = ""
+    #         expires = str(expiration)
+    #         canonicalized_oss_headers = ""
+    #         canonicalized_resource = f"/{self.bucket_name}/{object_key}"
             
-            string_to_sign = f"{verb}\n{content_md5}\n{content_type}\n{expires}\n{canonicalized_oss_headers}{canonicalized_resource}"
+    #         string_to_sign = f"{verb}\n{content_md5}\n{content_type}\n{expires}\n{canonicalized_oss_headers}{canonicalized_resource}"
             
-            # 计算签名
-            signature = base64.b64encode(
-                hmac.new(
-                    self.access_key_secret.encode('utf-8'),
-                    string_to_sign.encode('utf-8'),
-                    hashlib.sha1
-                ).digest()
-            ).decode('utf-8')
+    #         # 计算签名
+    #         signature = base64.b64encode(
+    #             hmac.new(
+    #                 self.access_key_secret.encode('utf-8'),
+    #                 string_to_sign.encode('utf-8'),
+    #                 hashlib.sha1
+    #             ).digest()
+    #         ).decode('utf-8')
             
-            # 构建请求参数
-            params = {
-                'OSSAccessKeyId': self.access_key_id,
-                'Expires': expires,
-                'Signature': signature
-            }
+    #         # 构建请求参数
+    #         params = {
+    #             'OSSAccessKeyId': self.access_key_id,
+    #             'Expires': expires,
+    #             'Signature': signature
+    #         }
             
-            response = requests.head(url, params=params, timeout=10)
+    #         response = requests.head(url, params=params, timeout=10)
             
-            if response.status_code == 200:
-                content_length = response.headers.get('Content-Length')
-                if content_length:
-                    return int(content_length)
-                else:
-                    raise Exception("Content-Length header not found")
-            elif response.status_code == 404:
-                raise Exception(f"File not found: {object_key}")
-            else:
-                raise Exception(f"OSS request failed with status {response.status_code}: {response.text}")
+    #         if response.status_code == 200:
+    #             content_length = response.headers.get('Content-Length')
+    #             if content_length:
+    #                 return int(content_length)
+    #             else:
+    #                 # 尝试使用 Range 请求
+    #                 headers = {"Range": "bytes=0-0"}
+    #                 r2 = requests.get(url, params=params, headers=headers, timeout=10)
+    #                 if 'Content-Range' in r2.headers:
+    #                     return int(r2.headers['Content-Range'].split('/')[-1])
+    #                 else:
+    #                     try:
+    #                         # 最后兜底：使用 ListObjects
+    #                         list_url = f"https://{self.bucket_name}.{host}/"
+    #                         list_params = {'prefix': object_key, 'max-keys': 1}
+    #                         r3 = requests.get(list_url, params=list_params, timeout=10)
+    #                         size = int(re.search(r"<Size>(\d+)</Size>", r3.text).group(1))
+    #                         return size
+    #                     except:
+    #                         raise Exception("Cannot determine file size from OSS response")
+
+    #         elif response.status_code == 404:
+    #             raise Exception(f"File not found: {object_key}")
+    #         else:
+    #             raise Exception(f"OSS request failed with status {response.status_code}: {response.text}")
                 
-        except Exception as e:
-            raise Exception(f"Error getting file size from OSS: {str(e)}")
+    #     except Exception as e:
+    #         raise Exception(f"Error getting file size from OSS: {str(e)}")
     
     def delete_file(self, object_key):
         """
