@@ -69,6 +69,12 @@ class FileViewSet(viewsets.ModelViewSet):
             if not all([file_name, file_size]):
                 return Response({'error': 'Need file_name and file_size'}, status=status.HTTP_400_BAD_REQUEST)
             
+            # 确保file_size是整数类型
+            try:
+                file_size = int(file_size)
+            except (ValueError, TypeError):
+                return Response({'error': 'file_size must be a valid integer'}, status=status.HTTP_400_BAD_REQUEST)
+            
             if user.used_space + file_size > user.quota:
                 return Response({'error': 'Storage quota exceeded'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -86,7 +92,7 @@ class FileViewSet(viewsets.ModelViewSet):
             cache.set(f"upload_token_{upload_id}", file_info, timeout=3600)  # 缓存1小时
 
             # 生成上传token
-            upload_token = token_generator.generate_upload_token(user.username, upload_id, file_size)
+            upload_token = token_generator.generate_upload_token(user.username, file_size)
             
             return Response({
                 'token': upload_token,

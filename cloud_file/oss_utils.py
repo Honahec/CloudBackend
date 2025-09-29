@@ -25,7 +25,6 @@ class OSSTokenGenerator:
         
         Args:
             username: 用户名
-            upload_id: 上传会话ID
             file_size: 预期文件大小（字节）
             duration_seconds: 令牌有效期（秒），默认1小时
             
