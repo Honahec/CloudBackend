@@ -46,6 +46,8 @@ class FileViewSet(viewsets.ModelViewSet):
             
             return Response({
                 'files': FileSerializer(queryset, many=True).data,
+                'quota': user.quota,
+                'used_space': user.used_space,
                 'message': 'Success'
             }, status=status.HTTP_200_OK)
         
